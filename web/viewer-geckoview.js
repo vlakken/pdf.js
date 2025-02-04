@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-import "web-com";
 import { RenderingStates, ScrollMode, SpreadMode } from "./ui_utils.js";
 import { AppOptions } from "./app_options.js";
 import { LinkTarget } from "./pdf_link_service.js";
@@ -54,19 +53,13 @@ function getViewerConfiguration() {
       submitButton: document.getElementById("passwordSubmit"),
       cancelButton: document.getElementById("passwordCancel"),
     },
-    openFileInput:
-      typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
-        ? document.getElementById("fileInput")
-        : null,
+    printContainer: document.getElementById("printContainer"),
   };
 }
 
 function webViewerLoad() {
   const config = getViewerConfiguration();
 
-  if (typeof PDFJSDev === "undefined") {
-    window.isGECKOVIEW = true;
-  }
   PDFViewerApplication.run(config);
 }
 

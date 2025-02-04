@@ -13,17 +13,18 @@
  * limitations under the License.
  */
 
+import {
+  FORMS_VERSION,
+  USERACTIVATION_CALLBACKID,
+  VIEWER_TYPE,
+  VIEWER_VARIATION,
+  VIEWER_VERSION,
+} from "./app_utils.js";
 import { Color } from "./color.js";
 import { EventDispatcher } from "./event.js";
 import { FullScreen } from "./fullscreen.js";
 import { PDFObject } from "./pdf_object.js";
 import { Thermometer } from "./thermometer.js";
-
-const VIEWER_TYPE = "PDF.js";
-const VIEWER_VARIATION = "Full";
-const VIEWER_VERSION = 21.00720099;
-const FORMS_VERSION = 21.00720099;
-const USERACTIVATION_CALLBACKID = 0;
 
 class App extends PDFObject {
   constructor(data) {
@@ -446,6 +447,9 @@ class App extends PDFObject {
       cMsg = cMsg.cMsg;
     }
     cMsg = (cMsg || "").toString();
+    if (!cMsg) {
+      return 0;
+    }
     nType =
       typeof nType !== "number" || isNaN(nType) || nType < 0 || nType > 3
         ? 0
@@ -654,4 +658,4 @@ class App extends PDFObject {
   }
 }
 
-export { App, USERACTIVATION_CALLBACKID };
+export { App };

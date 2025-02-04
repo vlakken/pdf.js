@@ -19,7 +19,7 @@ import {
   $getChildrenByClass,
   $getChildrenByName,
   $text,
-} from "../../src/core/xfa/xfa_object.js";
+} from "../../src/core/xfa/symbol_utils.js";
 import { Binder } from "../../src/core/xfa/bind.js";
 import { searchNode } from "../../src/core/xfa/som.js";
 import { XFAParser } from "../../src/core/xfa/parser.js";
@@ -1021,7 +1021,7 @@ describe("XFAParser", function () {
       ).toBe("SW1");
     });
 
-    it("should make basic binding with extra subform", function () {
+    it("should make basic binding with extra subform (consumeData)", function () {
       const xml = `
 <?xml version="1.0"?>
 <xdp:xdp xmlns:xdp="http://ns.adobe.com/xdp/">

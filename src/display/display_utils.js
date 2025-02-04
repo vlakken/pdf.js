@@ -14,23 +14,14 @@
  */
 
 import {
-  BaseCanvasFactory,
-  BaseCMapReaderFactory,
-  BaseFilterFactory,
-  BaseStandardFontDataFactory,
-  BaseSVGFactory,
-} from "./base_factory.js";
-import {
   BaseException,
+  FeatureTest,
   shadow,
-  stringToBytes,
   Util,
   warn,
 } from "../shared/util.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-
-const AnnotationPrefix = "pdfjs_internal_id_";
 
 class PixelsPerInch {
   static CSS = 96.0;
@@ -40,274 +31,7 @@ class PixelsPerInch {
   static PDF_TO_CSS_UNITS = this.CSS / this.PDF;
 }
 
-/**
- * FilterFactory aims to create some SVG filters we can use when drawing an
- * image (or whatever) on a canvas.
- * Filters aren't applied with ctx.putImageData because it just overwrites the
- * underlying pixels.
- * With these filters, it's possible for example to apply some transfer maps on
- * an image without the need to apply them on the pixel arrays: the renderer
- * does the magic for us.
- */
-class DOMFilterFactory extends BaseFilterFactory {
-  #_cache;
-
-  #_defs;
-
-  #docId;
-
-  #document;
-
-  #hcmFilter;
-
-  #hcmKey;
-
-  #hcmUrl;
-
-  #id = 0;
-
-  constructor({ docId, ownerDocument = globalThis.document } = {}) {
-    super();
-    this.#docId = docId;
-    this.#document = ownerDocument;
-  }
-
-  get #cache() {
-    return (this.#_cache ||= new Map());
-  }
-
-  get #defs() {
-    if (!this.#_defs) {
-      const div = this.#document.createElement("div");
-      const { style } = div;
-      style.visibility = "hidden";
-      style.contain = "strict";
-      style.width = style.height = 0;
-      style.position = "absolute";
-      style.top = style.left = 0;
-      style.zIndex = -1;
-
-      const svg = this.#document.createElementNS(SVG_NS, "svg");
-      svg.setAttribute("width", 0);
-      svg.setAttribute("height", 0);
-      this.#_defs = this.#document.createElementNS(SVG_NS, "defs");
-      div.append(svg);
-      svg.append(this.#_defs);
-      this.#document.body.append(div);
-    }
-    return this.#_defs;
-  }
-
-  #appendFeFunc(feComponentTransfer, func, table) {
-    const feFunc = this.#document.createElementNS(SVG_NS, func);
-    feFunc.setAttribute("type", "discrete");
-    feFunc.setAttribute("tableValues", table);
-    feComponentTransfer.append(feFunc);
-  }
-
-  addFilter(maps) {
-    if (!maps) {
-      return "none";
-    }
-
-    // When a page is zoomed the page is re-drawn but the maps are likely
-    // the same.
-    let value = this.#cache.get(maps);
-    if (value) {
-      return value;
-    }
-
-    let tableR, tableG, tableB, key;
-    if (maps.length === 1) {
-      const mapR = maps[0];
-      const buffer = new Array(256);
-      for (let i = 0; i < 256; i++) {
-        buffer[i] = mapR[i] / 255;
-      }
-      key = tableR = tableG = tableB = buffer.join(",");
-    } else {
-      const [mapR, mapG, mapB] = maps;
-      const bufferR = new Array(256);
-      const bufferG = new Array(256);
-      const bufferB = new Array(256);
-      for (let i = 0; i < 256; i++) {
-        bufferR[i] = mapR[i] / 255;
-        bufferG[i] = mapG[i] / 255;
-        bufferB[i] = mapB[i] / 255;
-      }
-      tableR = bufferR.join(",");
-      tableG = bufferG.join(",");
-      tableB = bufferB.join(",");
-      key = `${tableR}${tableG}${tableB}`;
-    }
-
-    value = this.#cache.get(key);
-    if (value) {
-      this.#cache.set(maps, value);
-      return value;
-    }
-
-    // We create a SVG filter: feComponentTransferElement
-    //  https://www.w3.org/TR/SVG11/filters.html#feComponentTransferElement
-
-    const id = `g_${this.#docId}_transfer_map_${this.#id++}`;
-    const url = `url(#${id})`;
-    this.#cache.set(maps, url);
-    this.#cache.set(key, url);
-
-    const filter = this.#document.createElementNS(SVG_NS, "filter", SVG_NS);
-    filter.setAttribute("id", id);
-    filter.setAttribute("color-interpolation-filters", "sRGB");
-    const feComponentTransfer = this.#document.createElementNS(
-      SVG_NS,
-      "feComponentTransfer"
-    );
-    filter.append(feComponentTransfer);
-
-    this.#appendFeFunc(feComponentTransfer, "feFuncR", tableR);
-    this.#appendFeFunc(feComponentTransfer, "feFuncG", tableG);
-    this.#appendFeFunc(feComponentTransfer, "feFuncB", tableB);
-
-    this.#defs.append(filter);
-
-    return url;
-  }
-
-  addHCMFilter(fgColor, bgColor) {
-    const key = `${fgColor}-${bgColor}`;
-    if (this.#hcmKey === key) {
-      return this.#hcmUrl;
-    }
-
-    this.#hcmKey = key;
-    this.#hcmUrl = "none";
-    this.#hcmFilter?.remove();
-
-    if (!fgColor || !bgColor) {
-      return this.#hcmUrl;
-    }
-
-    this.#defs.style.color = fgColor;
-    fgColor = getComputedStyle(this.#defs).getPropertyValue("color");
-    const fgRGB = getRGB(fgColor);
-    fgColor = Util.makeHexColor(...fgRGB);
-    this.#defs.style.color = bgColor;
-    bgColor = getComputedStyle(this.#defs).getPropertyValue("color");
-    const bgRGB = getRGB(bgColor);
-    bgColor = Util.makeHexColor(...bgRGB);
-    this.#defs.style.color = "";
-
-    if (
-      (fgColor === "#000000" && bgColor === "#ffffff") ||
-      fgColor === bgColor
-    ) {
-      return this.#hcmUrl;
-    }
-
-    // https://developer.mozilla.org/en-US/docs/Web/Accessibility/Understanding_Colors_and_Luminance
-    //
-    // Relative luminance:
-    // https://www.w3.org/TR/WCAG20/#relativeluminancedef
-    //
-    // We compute the rounded luminance of the default background color.
-    // Then for every color in the pdf, if its rounded luminance is the
-    // same as the background one then it's replaced by the new
-    // background color else by the foreground one.
-    const map = new Array(256);
-    for (let i = 0; i <= 255; i++) {
-      const x = i / 255;
-      map[i] = x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-    }
-    const table = map.join(",");
-
-    const id = `g_${this.#docId}_hcm_filter`;
-    const filter = (this.#hcmFilter = this.#document.createElementNS(
-      SVG_NS,
-      "filter",
-      SVG_NS
-    ));
-    filter.setAttribute("id", id);
-    filter.setAttribute("color-interpolation-filters", "sRGB");
-    let feComponentTransfer = this.#document.createElementNS(
-      SVG_NS,
-      "feComponentTransfer"
-    );
-    filter.append(feComponentTransfer);
-
-    this.#appendFeFunc(feComponentTransfer, "feFuncR", table);
-    this.#appendFeFunc(feComponentTransfer, "feFuncG", table);
-    this.#appendFeFunc(feComponentTransfer, "feFuncB", table);
-
-    const feColorMatrix = this.#document.createElementNS(
-      SVG_NS,
-      "feColorMatrix"
-    );
-    feColorMatrix.setAttribute("type", "matrix");
-    feColorMatrix.setAttribute(
-      "values",
-      "0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0"
-    );
-    filter.append(feColorMatrix);
-
-    feComponentTransfer = this.#document.createElementNS(
-      SVG_NS,
-      "feComponentTransfer"
-    );
-    filter.append(feComponentTransfer);
-
-    const getSteps = (c, n) => {
-      const start = fgRGB[c] / 255;
-      const end = bgRGB[c] / 255;
-      const arr = new Array(n + 1);
-      for (let i = 0; i <= n; i++) {
-        arr[i] = start + (i / n) * (end - start);
-      }
-      return arr.join(",");
-    };
-    this.#appendFeFunc(feComponentTransfer, "feFuncR", getSteps(0, 5));
-    this.#appendFeFunc(feComponentTransfer, "feFuncG", getSteps(1, 5));
-    this.#appendFeFunc(feComponentTransfer, "feFuncB", getSteps(2, 5));
-
-    this.#defs.append(filter);
-
-    this.#hcmUrl = `url(#${id})`;
-    return this.#hcmUrl;
-  }
-
-  destroy(keepHCM = false) {
-    if (keepHCM && this.#hcmUrl) {
-      return;
-    }
-    if (this.#_defs) {
-      this.#_defs.parentNode.parentNode.remove();
-      this.#_defs = null;
-    }
-    if (this.#_cache) {
-      this.#_cache.clear();
-      this.#_cache = null;
-    }
-    this.#id = 0;
-  }
-}
-
-class DOMCanvasFactory extends BaseCanvasFactory {
-  constructor({ ownerDocument = globalThis.document } = {}) {
-    super();
-    this._document = ownerDocument;
-  }
-
-  /**
-   * @ignore
-   */
-  _createCanvas(width, height) {
-    const canvas = this._document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    return canvas;
-  }
-}
-
-async function fetchData(url, asTypedArray = false) {
+async function fetchData(url, type = "text") {
   if (
     (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
     isValidFetchUrl(url, document.baseURI)
@@ -316,34 +40,37 @@ async function fetchData(url, asTypedArray = false) {
     if (!response.ok) {
       throw new Error(response.statusText);
     }
-    return asTypedArray
-      ? new Uint8Array(await response.arrayBuffer())
-      : stringToBytes(await response.text());
+    switch (type) {
+      case "arraybuffer":
+        return response.arrayBuffer();
+      case "blob":
+        return response.blob();
+      case "json":
+        return response.json();
+    }
+    return response.text();
   }
 
   // The Fetch API is not supported.
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open("GET", url, /* asTypedArray = */ true);
+    request.open("GET", url, /* async = */ true);
+    request.responseType = type;
 
-    if (asTypedArray) {
-      request.responseType = "arraybuffer";
-    }
     request.onreadystatechange = () => {
       if (request.readyState !== XMLHttpRequest.DONE) {
         return;
       }
       if (request.status === 200 || request.status === 0) {
-        let data;
-        if (asTypedArray && request.response) {
-          data = new Uint8Array(request.response);
-        } else if (!asTypedArray && request.responseText) {
-          data = stringToBytes(request.responseText);
+        switch (type) {
+          case "arraybuffer":
+          case "blob":
+          case "json":
+            resolve(request.response);
+            return;
         }
-        if (data) {
-          resolve(data);
-          return;
-        }
+        resolve(request.responseText);
+        return;
       }
       reject(new Error(request.statusText));
     };
@@ -352,39 +79,11 @@ async function fetchData(url, asTypedArray = false) {
   });
 }
 
-class DOMCMapReaderFactory extends BaseCMapReaderFactory {
-  /**
-   * @ignore
-   */
-  _fetchData(url, compressionType) {
-    return fetchData(url, /* asTypedArray = */ this.isCompressed).then(data => {
-      return { cMapData: data, compressionType };
-    });
-  }
-}
-
-class DOMStandardFontDataFactory extends BaseStandardFontDataFactory {
-  /**
-   * @ignore
-   */
-  _fetchData(url) {
-    return fetchData(url, /* asTypedArray = */ true);
-  }
-}
-
-class DOMSVGFactory extends BaseSVGFactory {
-  /**
-   * @ignore
-   */
-  _createSVG(type) {
-    return document.createElementNS(SVG_NS, type);
-  }
-}
-
 /**
  * @typedef {Object} PageViewportParameters
  * @property {Array<number>} viewBox - The xMin, yMin, xMax and
  *   yMax coordinates.
+ * @property {number} userUnit - The size of units.
  * @property {number} scale - The scale of the viewport.
  * @property {number} rotation - The rotation, in degrees, of the viewport.
  * @property {number} [offsetX] - The horizontal, i.e. x-axis, offset. The
@@ -418,6 +117,7 @@ class PageViewport {
    */
   constructor({
     viewBox,
+    userUnit,
     scale,
     rotation,
     offsetX = 0,
@@ -425,10 +125,13 @@ class PageViewport {
     dontFlip = false,
   }) {
     this.viewBox = viewBox;
+    this.userUnit = userUnit;
     this.scale = scale;
     this.rotation = rotation;
     this.offsetX = offsetX;
     this.offsetY = offsetY;
+
+    scale *= userUnit; // Take the userUnit into account.
 
     // creating transform to convert pdf coordinate system to the normal
     // canvas like coordinates taking in account scale and rotation
@@ -510,12 +213,14 @@ class PageViewport {
    * @type {Object}
    */
   get rawDims() {
-    const { viewBox } = this;
+    const { userUnit, viewBox } = this;
+    const dims = viewBox.map(x => x * userUnit);
+
     return shadow(this, "rawDims", {
-      pageWidth: viewBox[2] - viewBox[0],
-      pageHeight: viewBox[3] - viewBox[1],
-      pageX: viewBox[0],
-      pageY: viewBox[1],
+      pageWidth: dims[2] - dims[0],
+      pageHeight: dims[3] - dims[1],
+      pageX: dims[0],
+      pageY: dims[1],
     });
   }
 
@@ -533,6 +238,7 @@ class PageViewport {
   } = {}) {
     return new PageViewport({
       viewBox: this.viewBox.slice(),
+      userUnit: this.userUnit,
       scale,
       rotation,
       offsetX,
@@ -583,9 +289,8 @@ class PageViewport {
 }
 
 class RenderingCancelledException extends BaseException {
-  constructor(msg, type, extraDelay = 0) {
+  constructor(msg, extraDelay = 0) {
     super(msg, "RenderingCancelledException");
-    this.type = type;
     this.extraDelay = extraDelay;
   }
 }
@@ -606,13 +311,10 @@ function isPdfFile(filename) {
 /**
  * Gets the filename from a given URL.
  * @param {string} url
- * @param {boolean} [onlyStripPath]
  * @returns {string}
  */
-function getFilenameFromUrl(url, onlyStripPath = false) {
-  if (!onlyStripPath) {
-    [url] = url.split(/[#?]/, 1);
-  }
+function getFilenameFromUrl(url) {
+  [url] = url.split(/[#?]/, 1);
   return url.substring(url.lastIndexOf("/") + 1);
 }
 
@@ -648,7 +350,7 @@ function getPdfFilenameFromUrl(url, defaultFilename = "document.pdf") {
         suggestedFilename = reFilename.exec(
           decodeURIComponent(suggestedFilename)
         )[0];
-      } catch (ex) {
+      } catch {
         // Possible (extremely rare) errors:
         // URIError "Malformed URI", e.g. for "%AA.pdf"
         // TypeError "null has no properties", e.g. for "%2F.pdf"
@@ -698,46 +400,39 @@ class StatTimer {
 }
 
 function isValidFetchUrl(url, baseUrl) {
+  if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) {
+    throw new Error("Not implemented: isValidFetchUrl");
+  }
   try {
     const { protocol } = baseUrl ? new URL(url, baseUrl) : new URL(url);
     // The Fetch API only supports the http/https protocols, and not file/ftp.
     return protocol === "http:" || protocol === "https:";
-  } catch (ex) {
+  } catch {
     return false; // `new URL()` will throw on incorrect data.
   }
 }
 
 /**
- * @param {string} src
- * @param {boolean} [removeScriptElement]
- * @returns {Promise<void>}
+ * Event handler to suppress context menu.
  */
-function loadScript(src, removeScriptElement = false) {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = src;
+function noContextMenu(e) {
+  e.preventDefault();
+}
 
-    script.onload = function (evt) {
-      if (removeScriptElement) {
-        script.remove();
-      }
-      resolve(evt);
-    };
-    script.onerror = function () {
-      reject(new Error(`Cannot load script at: ${script.src}`));
-    };
-    (document.head || document.documentElement).append(script);
-  });
+function stopEvent(e) {
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 // Deprecated API function -- display regardless of the `verbosity` setting.
 function deprecated(details) {
+  // eslint-disable-next-line no-console
   console.log("Deprecated API usage: " + details);
 }
 
-let pdfDateStringRegex;
-
 class PDFDateString {
+  static #regex;
+
   /**
    * Convert a PDF date string to a JavaScript `Date` object.
    *
@@ -760,27 +455,25 @@ class PDFDateString {
     }
 
     // Lazily initialize the regular expression.
-    if (!pdfDateStringRegex) {
-      pdfDateStringRegex = new RegExp(
-        "^D:" + // Prefix (required)
-          "(\\d{4})" + // Year (required)
-          "(\\d{2})?" + // Month (optional)
-          "(\\d{2})?" + // Day (optional)
-          "(\\d{2})?" + // Hour (optional)
-          "(\\d{2})?" + // Minute (optional)
-          "(\\d{2})?" + // Second (optional)
-          "([Z|+|-])?" + // Universal time relation (optional)
-          "(\\d{2})?" + // Offset hour (optional)
-          "'?" + // Splitting apostrophe (optional)
-          "(\\d{2})?" + // Offset minute (optional)
-          "'?" // Trailing apostrophe (optional)
-      );
-    }
+    this.#regex ||= new RegExp(
+      "^D:" + // Prefix (required)
+        "(\\d{4})" + // Year (required)
+        "(\\d{2})?" + // Month (optional)
+        "(\\d{2})?" + // Day (optional)
+        "(\\d{2})?" + // Hour (optional)
+        "(\\d{2})?" + // Minute (optional)
+        "(\\d{2})?" + // Second (optional)
+        "([Z|+|-])?" + // Universal time relation (optional)
+        "(\\d{2})?" + // Offset hour (optional)
+        "'?" + // Splitting apostrophe (optional)
+        "(\\d{2})?" + // Offset minute (optional)
+        "'?" // Trailing apostrophe (optional)
+    );
 
     // Optional fields that don't satisfy the requirements from the regular
     // expression (such as incorrect digit counts or numbers that are out of
     // range) will fall back the defaults from the specification.
-    const matches = pdfDateStringRegex.exec(input);
+    const matches = this.#regex.exec(input);
     if (!matches) {
       return null;
     }
@@ -829,6 +522,7 @@ function getXfaPageViewport(xfaPage, { scale = 1, rotation = 0 }) {
 
   return new PageViewport({
     viewBox,
+    userUnit: 1,
     scale,
     rotation,
   });
@@ -901,15 +595,16 @@ function setLayerDimensions(
   if (viewport instanceof PageViewport) {
     const { pageWidth, pageHeight } = viewport.rawDims;
     const { style } = div;
+    const useRound = FeatureTest.isCSSRoundSupported;
 
-    // TODO: Investigate if it could be interesting to use the css round
-    // function (https://developer.mozilla.org/en-US/docs/Web/CSS/round):
-    // const widthStr =
-    //   `round(down, var(--scale-factor) * ${pageWidth}px, 1px)`;
-    // const heightStr =
-    //   `round(down, var(--scale-factor) * ${pageHeight}px, 1px)`;
-    const widthStr = `calc(var(--scale-factor) * ${pageWidth}px)`;
-    const heightStr = `calc(var(--scale-factor) * ${pageHeight}px)`;
+    const w = `var(--scale-factor) * ${pageWidth}px`,
+      h = `var(--scale-factor) * ${pageHeight}px`;
+    const widthStr = useRound
+        ? `round(down, ${w}, var(--scale-round-x, 1px))`
+        : `calc(${w})`,
+      heightStr = useRound
+        ? `round(down, ${h}, var(--scale-round-y, 1px))`
+        : `calc(${h})`;
 
     if (!mustFlip || viewport.rotation % 180 === 0) {
       style.width = widthStr;
@@ -925,14 +620,53 @@ function setLayerDimensions(
   }
 }
 
+/**
+ * Scale factors for the canvas, necessary with HiDPI displays.
+ */
+class OutputScale {
+  constructor() {
+    const pixelRatio = window.devicePixelRatio || 1;
+
+    /**
+     * @type {number} Horizontal scale.
+     */
+    this.sx = pixelRatio;
+
+    /**
+     * @type {number} Vertical scale.
+     */
+    this.sy = pixelRatio;
+  }
+
+  /**
+   * @type {boolean} Returns `true` when scaling is required, `false` otherwise.
+   */
+  get scaled() {
+    return this.sx !== 1 || this.sy !== 1;
+  }
+
+  get symmetric() {
+    return this.sx === this.sy;
+  }
+}
+
+// See https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types
+// to know which types are supported by the browser.
+const SupportedImageMimeTypes = [
+  "image/apng",
+  "image/avif",
+  "image/bmp",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/svg+xml",
+  "image/webp",
+  "image/x-icon",
+];
+
 export {
-  AnnotationPrefix,
   deprecated,
-  DOMCanvasFactory,
-  DOMCMapReaderFactory,
-  DOMFilterFactory,
-  DOMStandardFontDataFactory,
-  DOMSVGFactory,
+  fetchData,
   getColorValues,
   getCurrentTransform,
   getCurrentTransformInverse,
@@ -943,11 +677,15 @@ export {
   isDataScheme,
   isPdfFile,
   isValidFetchUrl,
-  loadScript,
+  noContextMenu,
+  OutputScale,
   PageViewport,
   PDFDateString,
   PixelsPerInch,
   RenderingCancelledException,
   setLayerDimensions,
   StatTimer,
+  stopEvent,
+  SupportedImageMimeTypes,
+  SVG_NS,
 };

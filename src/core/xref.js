@@ -33,6 +33,8 @@ import { BaseStream } from "./base_stream.js";
 import { CipherTransformFactory } from "./crypto.js";
 
 class XRef {
+  #firstXRefStmPos = null;
+
   constructor(stream, pdfManager) {
     this.stream = stream;
     this.pdfManager = pdfManager;
@@ -42,6 +44,7 @@ class XRef {
     this._pendingRefs = new RefSet();
     this._newPersistentRefNum = null;
     this._newTemporaryRefNum = null;
+    this._persistentRefsCache = null;
   }
 
   getNewPersistentRef(obj) {
@@ -61,6 +64,19 @@ class XRef {
     // stream.
     if (this._newTemporaryRefNum === null) {
       this._newTemporaryRefNum = this.entries.length || 1;
+      if (this._newPersistentRefNum) {
+        this._persistentRefsCache = new Map();
+        for (
+          let i = this._newTemporaryRefNum;
+          i < this._newPersistentRefNum;
+          i++
+        ) {
+          // We *temporarily* clear the cache, see `resetNewTemporaryRef` below,
+          // to avoid any conflict with the refs created during saving.
+          this._persistentRefsCache.set(i, this._cacheMap.get(i));
+          this._cacheMap.delete(i);
+        }
+      }
     }
     return Ref.get(this._newTemporaryRefNum++, 0);
   }
@@ -68,6 +84,12 @@ class XRef {
   resetNewTemporaryRef() {
     // Called once saving is finished.
     this._newTemporaryRefNum = null;
+    if (this._persistentRefsCache) {
+      for (const [num, obj] of this._persistentRefsCache) {
+        this._cacheMap.set(num, obj);
+      }
+    }
+    this._persistentRefsCache = null;
   }
 
   setStartXRef(startXRef) {
@@ -98,7 +120,7 @@ class XRef {
     }
     if (encrypt instanceof Dict) {
       const ids = trailerDict.get("ID");
-      const fileId = ids && ids.length ? ids[0] : "";
+      const fileId = ids?.length ? ids[0] : "";
       // The 'Encrypt' dictionary itself should not be encrypted, and by
       // setting `suppressEncryption` we can prevent an infinite loop inside
       // of `XRef_fetchUncompressed` if the dictionary contains indirect
@@ -288,18 +310,15 @@ class XRef {
     if (!("streamState" in this)) {
       // Stores state of the stream as we process it so we can resume
       // from middle of stream in case of missing data error
-      const streamParameters = stream.dict;
-      const byteWidths = streamParameters.get("W");
-      let range = streamParameters.get("Index");
-      if (!range) {
-        range = [0, streamParameters.get("Size")];
-      }
+      const { dict, pos } = stream;
+      const byteWidths = dict.get("W");
+      const range = dict.get("Index") || [0, dict.get("Size")];
 
       this.streamState = {
         entryRanges: range,
         byteWidths,
         entryNum: 0,
-        streamPos: stream.pos,
+        streamPos: pos,
       };
     }
     this.readXRefStream(stream);
@@ -429,7 +448,7 @@ class XRef {
       }
       return skipped;
     }
-    const gEndobjRegExp = /\b(endobj|\d+\s+\d+\s+obj|xref|trailer)\b/g;
+    const gEndobjRegExp = /\b(endobj|\d+\s+\d+\s+obj|xref|trailer\s*<<)\b/g;
     const gStartxrefRegExp = /\b(startxref|\d+\s+\d+\s+obj)\b/g;
     const objRegExp = /^(\d+)\s+(\d+)\s+obj\b/;
 
@@ -658,6 +677,31 @@ class XRef {
     if (this.topDict) {
       return this.topDict;
     }
+
+    // When no trailer dictionary candidate exists, try picking the first
+    // dictionary that contains a /Root entry (fixes issue18986.pdf).
+    if (!trailerDicts.length) {
+      for (const [num, entry] of this.entries.entries()) {
+        if (!entry) {
+          continue;
+        }
+        const ref = Ref.get(num, entry.gen);
+        let obj;
+
+        try {
+          obj = this.fetch(ref);
+        } catch {
+          continue;
+        }
+        if (obj instanceof BaseStream) {
+          obj = obj.dict;
+        }
+        if (obj instanceof Dict && obj.has("Root")) {
+          return obj;
+        }
+      }
+    }
+
     // nothing helps
     throw new InvalidPDFException("Invalid PDF structure.");
   }
@@ -705,6 +749,7 @@ class XRef {
             // (possible infinite recursion)
             this._xrefStms.add(obj);
             this.startXRefQueue.push(obj);
+            this.#firstXRefStmPos ??= obj;
           }
         } else if (Number.isInteger(obj)) {
           // Parse in-stream XRef
@@ -754,7 +799,10 @@ class XRef {
   }
 
   get lastXRefStreamPos() {
-    return this._xrefStms.size > 0 ? Math.max(...this._xrefStms) : null;
+    return (
+      this.#firstXRefStmPos ??
+      (this._xrefStms.size > 0 ? Math.max(...this._xrefStms) : null)
+    );
   }
 
   getEntry(i) {
@@ -808,11 +856,9 @@ class XRef {
     this._pendingRefs.put(ref);
 
     try {
-      if (xrefEntry.uncompressed) {
-        xrefEntry = this.fetchUncompressed(ref, xrefEntry, suppressEncryption);
-      } else {
-        xrefEntry = this.fetchCompressed(ref, xrefEntry, suppressEncryption);
-      }
+      xrefEntry = xrefEntry.uncompressed
+        ? this.fetchUncompressed(ref, xrefEntry, suppressEncryption)
+        : this.fetchCompressed(ref, xrefEntry, suppressEncryption);
       this._pendingRefs.remove(ref);
     } catch (ex) {
       this._pendingRefs.remove(ref);
@@ -867,11 +913,10 @@ class XRef {
       }
       throw new XRefEntryException(`Bad (uncompressed) XRef entry: ${ref}`);
     }
-    if (this.encrypt && !suppressEncryption) {
-      xrefEntry = parser.getObj(this.encrypt.createCipherTransform(num, gen));
-    } else {
-      xrefEntry = parser.getObj();
-    }
+    xrefEntry =
+      this.encrypt && !suppressEncryption
+        ? parser.getObj(this.encrypt.createCipherTransform(num, gen))
+        : parser.getObj();
     if (!(xrefEntry instanceof BaseStream)) {
       if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
         assert(

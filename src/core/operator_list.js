@@ -589,11 +589,10 @@ class OperatorList {
     this._streamSink = streamSink;
     this.fnArray = [];
     this.argsArray = [];
-    if (streamSink && !(intent & RenderingIntentFlag.OPLIST)) {
-      this.optimizer = new QueueOptimizer(this);
-    } else {
-      this.optimizer = new NullOptimizer(this);
-    }
+    this.optimizer =
+      streamSink && !(intent & RenderingIntentFlag.OPLIST)
+        ? new QueueOptimizer(this)
+        : new NullOptimizer(this);
     this.dependencies = new Set();
     this._totalLength = 0;
     this.weight = 0;
@@ -637,7 +636,11 @@ class OperatorList {
     }
   }
 
-  addImageOps(fn, args, optionalContent) {
+  addImageOps(fn, args, optionalContent, hasMask = false) {
+    if (hasMask) {
+      this.addOp(OPS.save);
+      this.addOp(OPS.setGState, [[["SMask", false]]]);
+    }
     if (optionalContent !== undefined) {
       this.addOp(OPS.beginMarkedContentProps, ["OC", optionalContent]);
     }
@@ -646,6 +649,9 @@ class OperatorList {
 
     if (optionalContent !== undefined) {
       this.addOp(OPS.endMarkedContent, []);
+    }
+    if (hasMask) {
+      this.addOp(OPS.restore);
     }
   }
 
@@ -693,11 +699,7 @@ class OperatorList {
         case OPS.paintInlineImageXObjectGroup:
         case OPS.paintImageMaskXObject:
           const arg = argsArray[i][0]; // First parameter in imgData.
-          if (
-            !arg.cached &&
-            arg.data &&
-            arg.data.buffer instanceof ArrayBuffer
-          ) {
+          if (!arg.cached && arg.data?.buffer instanceof ArrayBuffer) {
             transfers.push(arg.data.buffer);
           }
           break;

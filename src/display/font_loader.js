@@ -15,22 +15,24 @@
 
 import {
   assert,
-  bytesToString,
-  FeatureTest,
+  isNodeJS,
   shadow,
   string32,
+  toBase64Util,
+  unreachable,
   warn,
 } from "../shared/util.js";
-import { isNodeJS } from "../shared/is_node.js";
 
 class FontLoader {
+  #systemFonts = new Set();
+
   constructor({
     ownerDocument = globalThis.document,
     styleElement = null, // For testing only.
   }) {
     this._document = ownerDocument;
 
-    this.nativeFontFaces = [];
+    this.nativeFontFaces = new Set();
     this.styleElement =
       typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")
         ? styleElement
@@ -43,8 +45,13 @@ class FontLoader {
   }
 
   addNativeFontFace(nativeFontFace) {
-    this.nativeFontFaces.push(nativeFontFace);
+    this.nativeFontFaces.add(nativeFontFace);
     this._document.fonts.add(nativeFontFace);
+  }
+
+  removeNativeFontFace(nativeFontFace) {
+    this.nativeFontFaces.delete(nativeFontFace);
+    this._document.fonts.delete(nativeFontFace);
   }
 
   insertRule(rule) {
@@ -62,7 +69,8 @@ class FontLoader {
     for (const nativeFontFace of this.nativeFontFaces) {
       this._document.fonts.delete(nativeFontFace);
     }
-    this.nativeFontFaces.length = 0;
+    this.nativeFontFaces.clear();
+    this.#systemFonts.clear();
 
     if (this.styleElement) {
       // Note: ChildNode.remove doesn't throw if the parentNode is undefined.
@@ -71,12 +79,49 @@ class FontLoader {
     }
   }
 
+  async loadSystemFont({ systemFontInfo: info, _inspectFont }) {
+    if (!info || this.#systemFonts.has(info.loadedName)) {
+      return;
+    }
+    assert(
+      !this.disableFontFace,
+      "loadSystemFont shouldn't be called when `disableFontFace` is set."
+    );
+
+    if (this.isFontLoadingAPISupported) {
+      const { loadedName, src, style } = info;
+      const fontFace = new FontFace(loadedName, src, style);
+      this.addNativeFontFace(fontFace);
+      try {
+        await fontFace.load();
+        this.#systemFonts.add(loadedName);
+        _inspectFont?.(info);
+      } catch {
+        warn(
+          `Cannot load system font: ${info.baseFontName}, installing it could help to improve PDF rendering.`
+        );
+
+        this.removeNativeFontFace(fontFace);
+      }
+      return;
+    }
+
+    unreachable(
+      "Not implemented: loadSystemFont without the Font Loading API."
+    );
+  }
+
   async bind(font) {
     // Add the font to the DOM only once; skip if the font is already loaded.
-    if (font.attached || font.missingFile) {
+    if (font.attached || (font.missingFile && !font.systemFontInfo)) {
       return;
     }
     font.attached = true;
+
+    if (font.systemFontInfo) {
+      await this.loadSystemFont(font);
+      return;
+    }
 
     if (this.isFontLoadingAPISupported) {
       const nativeFontFace = font.createNativeFontFace();
@@ -138,6 +183,7 @@ class FontLoader {
         supported = true;
       } else if (
         typeof navigator !== "undefined" &&
+        typeof navigator?.userAgent === "string" &&
         // User agent string sniffing is bad, but there is no reliable way to
         // tell if the font is fully loaded and ready to be used with canvas.
         /Mozilla\/5.0.*?rv:\d+.*? Gecko/.test(navigator.userAgent)
@@ -315,21 +361,15 @@ class FontLoader {
 class FontFaceObject {
   constructor(
     translatedData,
-    {
-      isEvalSupported = true,
-      disableFontFace = false,
-      ignoreErrors = false,
-      inspectFont = null,
-    }
+    { disableFontFace = false, fontExtraProperties = false, inspectFont = null }
   ) {
     this.compiledGlyphs = Object.create(null);
     // importing translated data
     for (const i in translatedData) {
       this[i] = translatedData[i];
     }
-    this.isEvalSupported = isEvalSupported !== false;
     this.disableFontFace = disableFontFace === true;
-    this.ignoreErrors = ignoreErrors === true;
+    this.fontExtraProperties = fontExtraProperties === true;
     this._inspectFont = inspectFont;
   }
 
@@ -362,9 +402,8 @@ class FontFaceObject {
     if (!this.data || this.disableFontFace) {
       return null;
     }
-    const data = bytesToString(this.data);
     // Add the @font-face rule to the document.
-    const url = `url(data:${this.mimetype};base64,${btoa(data)});`;
+    const url = `url(data:${this.mimetype};base64,${toBase64Util(this.data)});`;
     let rule;
     if (!this.cssFontInfo) {
       rule = `@font-face {font-family:"${this.loadedName}";src:${url}}`;
@@ -385,45 +424,20 @@ class FontFaceObject {
       return this.compiledGlyphs[character];
     }
 
+    const objId = this.loadedName + "_path_" + character;
     let cmds;
     try {
-      cmds = objs.get(this.loadedName + "_path_" + character);
+      cmds = objs.get(objId);
     } catch (ex) {
-      if (!this.ignoreErrors) {
-        throw ex;
-      }
       warn(`getPathGenerator - ignoring character: "${ex}".`);
-
-      return (this.compiledGlyphs[character] = function (c, size) {
-        // No-op function, to allow rendering to continue.
-      });
     }
+    const path = new Path2D(cmds || "");
 
-    // If we can, compile cmds into JS for MAXIMUM SPEED...
-    if (this.isEvalSupported && FeatureTest.isEvalSupported) {
-      const jsBuf = [];
-      for (const current of cmds) {
-        const args = current.args !== undefined ? current.args.join(",") : "";
-        jsBuf.push("c.", current.cmd, "(", args, ");\n");
-      }
-      // eslint-disable-next-line no-new-func
-      return (this.compiledGlyphs[character] = new Function(
-        "c",
-        "size",
-        jsBuf.join("")
-      ));
+    if (!this.fontExtraProperties) {
+      // Remove the raw path-string, since we don't need it anymore.
+      objs.delete(objId);
     }
-    // ... but fall back on using Function.prototype.apply() if we're
-    // blocked from using eval() for whatever reason (like CSP policies).
-    return (this.compiledGlyphs[character] = function (c, size) {
-      for (const current of cmds) {
-        if (current.cmd === "scale") {
-          current.args = [size, -size];
-        }
-        // eslint-disable-next-line prefer-spread
-        c[current.cmd].apply(c, current.args);
-      }
-    });
+    return (this.compiledGlyphs[character] = path);
   }
 }
 

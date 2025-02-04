@@ -27,8 +27,7 @@ import {
   $pushGlyphs,
   $text,
   $toHTML,
-  XmlObject,
-} from "./xfa_object.js";
+} from "./symbol_utils.js";
 import { $buildXFAObject, NamespaceIds } from "./namespaces.js";
 import {
   fixTextIndent,
@@ -37,6 +36,7 @@ import {
   setFontFamily,
 } from "./html_utils.js";
 import { getMeasurement, HTMLResult, stripQuotes } from "./utils.js";
+import { XmlObject } from "./xfa_object.js";
 
 const XHTML_NS_ID = NamespaceIds.xhtml.id;
 const $richText = Symbol();
@@ -94,7 +94,8 @@ const StyleMapping = new Map([
   [
     "font-size",
     (value, original) => {
-      value = original.fontSize = getMeasurement(value);
+      // The font size must be positive.
+      value = original.fontSize = Math.abs(getMeasurement(value));
       return measureToString(0.99 * value);
     },
   ],
@@ -127,18 +128,13 @@ function mapStyle(styleStr, node, richText) {
     }
     let newValue = value;
     if (mapping) {
-      if (typeof mapping === "string") {
-        newValue = mapping;
-      } else {
-        newValue = mapping(value, original);
-      }
+      newValue =
+        typeof mapping === "string" ? mapping : mapping(value, original);
     }
     if (key.endsWith("scale")) {
-      if (style.transform) {
-        style.transform = `${style[key]} ${newValue}`;
-      } else {
-        style.transform = newValue;
-      }
+      style.transform = style.transform
+        ? `${style[key]} ${newValue}`
+        : newValue;
     } else {
       style[key.replaceAll(/-([a-zA-Z])/g, (_, x) => x.toUpperCase())] =
         newValue;
@@ -450,7 +446,7 @@ class Html extends XhtmlObject {
 
     if (children.length === 1) {
       const child = children[0];
-      if (child.attributes && child.attributes.class.includes("xfaRich")) {
+      if (child.attributes?.class.includes("xfaRich")) {
         return HTMLResult.success(child);
       }
     }
