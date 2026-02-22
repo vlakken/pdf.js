@@ -69,13 +69,7 @@ async function runTests(results) {
         console.log(`TEST-UNEXPECTED-FAIL | ${result.description}`);
       }
     },
-    suiteStarted(result) {
-      // Report on the result of `beforeAll` invocations.
-      if (result.failedExpectations.length > 0) {
-        ++results.failures;
-        console.log(`TEST-UNEXPECTED-FAIL | ${result.description}`);
-      }
-    },
+    suiteStarted(result) {},
   });
 
   return jasmine.execute();

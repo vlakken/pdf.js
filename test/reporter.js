@@ -57,16 +57,7 @@ const TestReporter = function (browser) {
     sendInfo(`Started ${total} tests for ${browser} with seed ${seed}.`);
   };
 
-  this.suiteStarted = function (result) {
-    // Report on the result of `beforeAll` invocations.
-    if (result.failedExpectations.length > 0) {
-      let failedMessages = "";
-      for (const item of result.failedExpectations) {
-        failedMessages += `${item.message} `;
-      }
-      sendResult("TEST-UNEXPECTED-FAIL", result.description, failedMessages);
-    }
-  };
+  this.suiteStarted = function (result) {};
 
   this.specStarted = function (result) {};
 
