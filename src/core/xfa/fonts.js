@@ -48,14 +48,11 @@ class FontFinder {
   addPdfFont(pdfFont) {
     const cssFontInfo = pdfFont.cssFontInfo;
     const name = cssFontInfo.fontFamily;
-    let font = this.fonts.get(name);
-    if (!font) {
-      font = Object.create(null);
-      this.fonts.set(name, font);
-      if (!this.defaultFont) {
-        this.defaultFont = font;
-      }
-    }
+    const font = this.fonts.getOrInsertComputed(name, () =>
+      Object.create(null)
+    );
+    this.defaultFont ??= font;
+
     let property = "";
     const fontWeight = parseFloat(cssFontInfo.fontWeight);
     if (parseFloat(cssFontInfo.italicAngle) !== 0) {

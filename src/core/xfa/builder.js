@@ -166,12 +166,7 @@ class Builder {
   _addNamespacePrefix(prefixes) {
     for (const { prefix, value } of prefixes) {
       const namespace = this._searchNamespace(value);
-      let prefixStack = this._namespacePrefixes.get(prefix);
-      if (!prefixStack) {
-        prefixStack = [];
-        this._namespacePrefixes.set(prefix, prefixStack);
-      }
-      prefixStack.push(namespace);
+      this._namespacePrefixes.getOrInsert(prefix, []).push(namespace);
     }
   }
 

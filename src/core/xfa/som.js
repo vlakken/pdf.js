@@ -193,11 +193,7 @@ function searchNode(
       let children, cached;
 
       if (useCache) {
-        cached = somCache.get(node);
-        if (!cached) {
-          cached = new Map();
-          somCache.set(node, cached);
-        }
+        cached = somCache.getOrInsertComputed(node, () => new Map());
         children = cached.get(cacheName);
       }
 
