@@ -1236,6 +1236,7 @@ function _isValidExplicitDest(validRef, validName, dest) {
 
 // Helpers for simple `Map.prototype.getOrInsertComputed()` invocations,
 // to avoid duplicate function creation.
+const makeArr = () => [];
 const makeMap = () => new Map();
 const makeObj = () => Object.create(null);
 
@@ -1336,6 +1337,7 @@ export {
   isNodeJS,
   LINE_DESCENT_FACTOR,
   LINE_FACTOR,
+  makeArr,
   makeMap,
   makeObj,
   MathClamp,

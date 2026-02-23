@@ -20,6 +20,7 @@ import {
   info,
   InvalidPDFException,
   isArrayEqual,
+  makeArr,
   objectSize,
   PageActionEventType,
   RenderingIntentFlag,
@@ -1892,7 +1893,7 @@ class PDFDocument {
       orphanFields.put(fieldRef, parentRef);
     }
 
-    promises.getOrInsert(name, []).push(
+    promises.getOrInsertComputed(name, makeArr).push(
       AnnotationFactory.create(
         xref,
         fieldRef,

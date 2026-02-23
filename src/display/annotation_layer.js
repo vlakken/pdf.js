@@ -36,6 +36,7 @@ import {
   AnnotationType,
   FeatureTest,
   LINE_FACTOR,
+  makeArr,
   shadow,
   unreachable,
   Util,
@@ -3877,7 +3878,9 @@ class AnnotationLayer {
         this.#elements.push(element);
 
         if (data.popupRef) {
-          popupToElements.getOrInsert(data.popupRef, []).push(element);
+          popupToElements
+            .getOrInsertComputed(data.popupRef, makeArr)
+            .push(element);
         }
       }
 

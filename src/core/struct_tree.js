@@ -15,6 +15,7 @@
 
 import {
   AnnotationPrefix,
+  makeArr,
   stringToPDFString,
   stringToUTF8String,
   warn,
@@ -450,7 +451,7 @@ class StructTreeRoot {
     for (const element of elements) {
       if (element.structTreeParentId) {
         const id = parseInt(element.structTreeParentId.split("_mc")[1], 10);
-        idToElements.getOrInsert(id, []).push(element);
+        idToElements.getOrInsertComputed(id, makeArr).push(element);
       }
     }
 

@@ -18,6 +18,7 @@ import {
   assert,
   BaseException,
   hexNumbers,
+  makeArr,
   objectSize,
   stringToPDFString,
   Util,
@@ -669,7 +670,9 @@ function getNewAnnotationsMap(annotationStorage) {
     if (!key.startsWith(AnnotationEditorPrefix)) {
       continue;
     }
-    newAnnotationsByPage.getOrInsert(value.pageIndex, []).push(value);
+    newAnnotationsByPage
+      .getOrInsertComputed(value.pageIndex, makeArr)
+      .push(value);
   }
   return newAnnotationsByPage.size > 0 ? newAnnotationsByPage : null;
 }
