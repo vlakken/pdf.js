@@ -13,9 +13,9 @@
  * limitations under the License.
  */
 
+import { makeObj, warn } from "../../shared/util.js";
 import { $globalData } from "./symbol_utils.js";
 import { stripQuotes } from "./utils.js";
-import { warn } from "../../shared/util.js";
 
 class FontFinder {
   constructor(pdfFonts) {
@@ -48,9 +48,7 @@ class FontFinder {
   addPdfFont(pdfFont) {
     const cssFontInfo = pdfFont.cssFontInfo;
     const name = cssFontInfo.fontFamily;
-    const font = this.fonts.getOrInsertComputed(name, () =>
-      Object.create(null)
-    );
+    const font = this.fonts.getOrInsertComputed(name, makeObj);
     this.defaultFont ??= font;
 
     let property = "";

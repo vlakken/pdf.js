@@ -15,6 +15,11 @@
 
 const INITIAL_DATA = Symbol("INITIAL_DATA");
 
+const dataObj = () => ({
+  ...Promise.withResolvers(),
+  data: INITIAL_DATA,
+});
+
 /**
  * A PDF document and page is built of many objects. E.g. there are objects for
  * fonts, images, rendering code, etc. These objects may get processed inside of
@@ -30,10 +35,7 @@ class PDFObjects {
    * @returns {Object}
    */
   #ensureObj(objId) {
-    return this.#objs.getOrInsertComputed(objId, () => ({
-      ...Promise.withResolvers(),
-      data: INITIAL_DATA,
-    }));
+    return this.#objs.getOrInsertComputed(objId, dataObj);
   }
 
   /**

@@ -22,6 +22,7 @@ import {
   FONT_IDENTITY_MATRIX,
   ImageKind,
   info,
+  makeMap,
   OPS,
   shadow,
   TextRenderingMode,
@@ -989,10 +990,7 @@ class CanvasGraphics {
           : [currentTransform.slice(0, 4), fillColor]
       );
 
-      cache = this._cachedBitmapsMap.getOrInsertComputed(
-        mainKey,
-        () => new Map()
-      );
+      cache = this._cachedBitmapsMap.getOrInsertComputed(mainKey, makeMap);
       const cachedImage = cache.get(cacheKey);
       if (cachedImage && !isPatternFill) {
         const offsetX = Math.round(

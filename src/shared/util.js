@@ -1234,6 +1234,11 @@ function _isValidExplicitDest(validRef, validName, dest) {
   return true;
 }
 
+// Helpers for simple `Map.prototype.getOrInsertComputed()` invocations,
+// to avoid duplicate function creation.
+const makeMap = () => new Map();
+const makeObj = () => Object.create(null);
+
 // TODO: Replace all occurrences of this function with `Math.clamp` once
 //       https://github.com/tc39/proposal-math-clamp/ is generally available.
 function MathClamp(v, min, max) {
@@ -1331,6 +1336,8 @@ export {
   isNodeJS,
   LINE_DESCENT_FACTOR,
   LINE_FACTOR,
+  makeMap,
+  makeObj,
   MathClamp,
   MeshFigureType,
   normalizeUnicode,

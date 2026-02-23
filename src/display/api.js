@@ -25,6 +25,7 @@ import {
   getVerbosityLevel,
   info,
   isNodeJS,
+  makeObj,
   MathClamp,
   RenderingIntentFlag,
   setVerbosityLevel,
@@ -1502,8 +1503,9 @@ class PDFPageProxy {
     optionalContentConfigPromise ||=
       this._transport.getOptionalContentConfig(renderingIntent);
 
-    const intentState = this._intentStates.getOrInsertComputed(cacheKey, () =>
-      Object.create(null)
+    const intentState = this._intentStates.getOrInsertComputed(
+      cacheKey,
+      makeObj
     );
     // Ensure that a pending `streamReader` cancel timeout is always aborted.
     if (intentState.streamReaderCancelTimeout) {
@@ -1675,7 +1677,7 @@ class PDFPageProxy {
     );
     const intentState = this._intentStates.getOrInsertComputed(
       intentArgs.cacheKey,
-      () => Object.create(null)
+      makeObj
     );
     let opListTask;
 
