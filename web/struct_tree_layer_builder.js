@@ -15,7 +15,7 @@
 
 /** @typedef {import("../src/display/api").PDFPageProxy} PDFPageProxy */
 
-import { FeatureTest, shadow } from "pdfjs-lib";
+import { FeatureTest, makeMap, shadow } from "pdfjs-lib";
 import { removeNullCharacters } from "./ui_utils.js";
 
 const PDF_ROLE_TO_HTML_ROLE = {
@@ -251,12 +251,9 @@ class StructTreeLayerBuilder {
       const label = removeNullCharacters(alt);
       for (const child of structElement.children) {
         if (child.type === "annotation") {
-          let attrs = this.#elementAttributes.get(child.id);
-          if (!attrs) {
-            attrs = new Map();
-            this.#elementAttributes.set(child.id, attrs);
-          }
-          attrs.set("aria-label", label);
+          this.#elementAttributes
+            .getOrInsertComputed(child.id, makeMap)
+            .set("aria-label", label);
           added = true;
         }
       }
