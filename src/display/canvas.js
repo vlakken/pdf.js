@@ -2668,6 +2668,7 @@ class CanvasGraphics {
       ["BM", "source-over"],
       ["ca", 1],
       ["CA", 1],
+      ["TR", null],
     ]);
     this.groupStack.push(currentCtx);
     this.groupLevel++;

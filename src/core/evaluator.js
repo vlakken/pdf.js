@@ -903,6 +903,11 @@ class PartialEvaluator {
     let transferArray;
     if (Array.isArray(tr)) {
       transferArray = tr;
+      if (tr.length > 1 && tr.every(map => map === tr[0])) {
+        // All entries in the array are the same, so we can just use one of
+        // them.
+        transferArray = [tr[0]];
+      }
     } else if (isPDFFunction(tr)) {
       transferArray = [tr];
     } else {
