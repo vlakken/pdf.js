@@ -2,7 +2,7 @@ import globals from "globals";
 
 import import_ from "eslint-plugin-import";
 import jasmine from "eslint-plugin-jasmine";
-import json from "eslint-plugin-json";
+import json from "@eslint/json";
 import noUnsanitized from "eslint-plugin-no-unsanitized";
 import perfectionist from "eslint-plugin-perfectionist";
 import prettierRecommended from "eslint-plugin-prettier/recommended";
@@ -26,6 +26,7 @@ const chromiumExtensionServiceWorkerFiles = [
 export default [
   {
     ignores: [
+      "package-lock.json",
       "**/build/",
       "**/l10n/",
       "**/docs/",
@@ -53,7 +54,8 @@ export default [
 
   prettierRecommended,
   {
-    files: ["**/*.json"],
+    files: ["**/*.json", "**/.*.json"],
+    language: "json/json",
     ...json.configs.recommended,
   },
   {
