@@ -128,11 +128,14 @@ class Page {
     };
   }
 
-  #createPartialEvaluator(handler) {
+  #createPartialEvaluator(handler, pageIndex = this.pageIndex) {
+    // The pageIndex is used to identify the page some objects (like images)
+    // belong to.
+
     return new PartialEvaluator({
       xref: this.xref,
       handler,
-      pageIndex: this.pageIndex,
+      pageIndex,
       idFactory: this._localIdFactory,
       fontCache: this.fontCache,
       builtInCMapCache: this.builtInCMapCache,
@@ -463,7 +466,6 @@ class Page {
     task,
     intent,
     cacheKey,
-    pageId = this.pageIndex,
     pageIndex = this.pageIndex,
     annotationStorage = null,
     modifiedIds = null,
@@ -471,7 +473,7 @@ class Page {
     const contentStreamPromise = this.getContentStream();
     const resourcesPromise = this.loadResources(RESOURCES_KEYS_OPERATOR_LIST);
 
-    const partialEvaluator = this.#createPartialEvaluator(handler);
+    const partialEvaluator = this.#createPartialEvaluator(handler, pageIndex);
 
     const newAnnotsByPage = !this.xfaFactory
       ? getNewAnnotationsMap(annotationStorage)

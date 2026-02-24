@@ -52,10 +52,9 @@ describe("PDF Thumbnail View", () => {
 
           await waitForThumbnailVisible(page, 1);
 
-          const src = await page.$eval(thumbSelector, el => el.src);
-          expect(src)
-            .withContext(`In ${browserName}`)
-            .toMatch(/^blob:http:/);
+          await page.waitForSelector(`${thumbSelector}[src^="blob:http:"]`, {
+            visible: true,
+          });
         })
       );
     });
@@ -116,13 +115,12 @@ describe("PDF Thumbnail View", () => {
               `.thumbnail ${thumbSelector}[aria-current="page"]`,
               { visible: true }
             );
-            const src = await page.$eval(
-              `${thumbSelector} > img`,
-              el => el.src
+            await page.waitForSelector(
+              `${thumbSelector} > img[src^="blob:http:"]`,
+              {
+                visible: true,
+              }
             );
-            expect(src)
-              .withContext(`In ${browserName}`)
-              .toMatch(/^blob:http:/);
           }
         })
       );

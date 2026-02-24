@@ -984,4 +984,60 @@ describe("Reorganize Pages View", () => {
       );
     });
   });
+
+  describe("Thumbnails are not blank after cut/paste (bug 2018162)", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait(
+        "two_pages.pdf",
+        "#viewsManagerToggleButton",
+        "page-fit",
+        null,
+        { enableSplitMerge: true }
+      );
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("should check that the thumbnail has a blob src after cut and paste", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await waitForThumbnailVisible(page, 1);
+          await page.waitForSelector("#viewsManagerStatusActionButton", {
+            visible: true,
+          });
+          await waitAndClick(
+            page,
+            `.thumbnail:has(${getThumbnailSelector(1)}) input`
+          );
+
+          for (let i = 1; i <= 2; i++) {
+            await page.waitForSelector(
+              `${getThumbnailSelector(i)} > img[src^="blob:http:"]`,
+              { visible: true }
+            );
+          }
+
+          let handlePagesEdited = await waitForPagesEdited(page, "cut");
+          await waitAndClick(page, "#viewsManagerStatusActionButton");
+          await waitAndClick(page, "#viewsManagerStatusActionCut");
+          await awaitPromise(handlePagesEdited);
+
+          handlePagesEdited = await waitForPagesEdited(page);
+          await waitAndClick(page, `${getThumbnailSelector(1)}+button`);
+          await awaitPromise(handlePagesEdited);
+
+          for (let i = 1; i <= 2; i++) {
+            await page.waitForSelector(
+              `${getThumbnailSelector(i)} > img[src^="blob:http:"]`,
+              { visible: true }
+            );
+          }
+        })
+      );
+    });
+  });
 });
