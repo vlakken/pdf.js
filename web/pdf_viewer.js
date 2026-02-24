@@ -33,6 +33,7 @@ import {
   AnnotationEditorType,
   AnnotationEditorUIManager,
   AnnotationMode,
+  makeArr,
   MathClamp,
   PermissionFlag,
   PixelsPerInch,
@@ -2281,7 +2282,7 @@ class PDFViewer {
           if (percent === 0 || widthPercent < 100) {
             continue;
           }
-          pageLayout.getOrInsert(y, []).push(id);
+          pageLayout.getOrInsertComputed(y, makeArr).push(id);
         }
         // Find the row of the current page.
         for (const yArray of pageLayout.values()) {

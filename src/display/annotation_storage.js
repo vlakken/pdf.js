@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import { shadow, unreachable } from "../shared/util.js";
+import { makeMap, shadow, unreachable } from "../shared/util.js";
 import { AnnotationEditor } from "./editor/editor.js";
 import { MurmurHash3_64 } from "../shared/murmurhash3.js";
 
@@ -260,7 +260,7 @@ class AnnotationStorage {
         if (key === "type") {
           continue;
         }
-        const counters = map.getOrInsertComputed(key, () => new Map());
+        const counters = map.getOrInsertComputed(key, makeMap);
         counters.set(val, (counters.get(val) ?? 0) + 1);
       }
     }
