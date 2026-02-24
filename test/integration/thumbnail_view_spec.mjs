@@ -29,6 +29,23 @@ async function waitForMenu(page, buttonSelector, visible = true) {
   );
 }
 
+async function showViewsManager(page) {
+  const hasAnimations = await page.evaluate(
+    () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  await page.click("#viewsManagerToggleButton");
+  if (hasAnimations) {
+    await page.waitForSelector("#outerContainer.viewsManagerMoving", {
+      visible: true,
+    });
+  }
+  await page.waitForSelector("#viewsManager", { visible: true });
+  await page.waitForSelector(
+    "#outerContainer:not(.viewsManagerMoving).viewsManagerOpen",
+    { visible: true }
+  );
+}
+
 describe("PDF Thumbnail View", () => {
   describe("Works without errors", () => {
     let pages;
@@ -44,7 +61,7 @@ describe("PDF Thumbnail View", () => {
     it("should render thumbnails without errors", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
+          await showViewsManager(page);
 
           const thumbSelector =
             "#thumbnailsView .thumbnailImageContainer > img";
@@ -62,7 +79,7 @@ describe("PDF Thumbnail View", () => {
     it("should have accessible label on resizer", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
+          await showViewsManager(page);
 
           const ariaLabel = await page.$eval("#viewsManagerResizer", el =>
             el.getAttribute("aria-label")
@@ -104,8 +121,7 @@ describe("PDF Thumbnail View", () => {
     it("should scroll the view", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
-
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
 
           for (const pageNum of [14, 1, 13, 2]) {
@@ -141,8 +157,7 @@ describe("PDF Thumbnail View", () => {
     it("should navigate with the keyboard", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
-
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
           await waitForThumbnailVisible(page, 2);
           await waitForThumbnailVisible(page, 3);
@@ -235,7 +250,7 @@ describe("PDF Thumbnail View", () => {
     it("should open with Enter key and remain open", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
 
           await enableMenuItems(page);
@@ -267,7 +282,7 @@ describe("PDF Thumbnail View", () => {
     it("should open with Space key and remain open", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
 
           await enableMenuItems(page);
@@ -326,8 +341,7 @@ describe("PDF Thumbnail View", () => {
     it("should have accessible label on checkbox", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
-
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
 
           const ariaLabel = await page.$eval(
@@ -362,7 +376,7 @@ describe("PDF Thumbnail View", () => {
     it("must navigate menus with ArrowDown and Tab keys", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
 
           // Focus the views manager selector button
@@ -431,7 +445,7 @@ describe("PDF Thumbnail View", () => {
     it("should show the manage button in thumbnail view and hide it in outline view", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
 
           // The status bar (Select pages + Manage button) must be visible in
@@ -471,8 +485,7 @@ describe("PDF Thumbnail View", () => {
     it("should focus checkboxes with Tab key", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
-
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
 
           // Focus the first thumbnail button
@@ -499,8 +512,7 @@ describe("PDF Thumbnail View", () => {
     it("should navigate checkboxes with arrow keys", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          await page.click("#viewsManagerToggleButton");
-
+          await showViewsManager(page);
           await waitForThumbnailVisible(page, 1);
           await waitForThumbnailVisible(page, 2);
 

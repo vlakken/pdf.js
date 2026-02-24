@@ -119,7 +119,6 @@ class PDFThumbnailView extends RenderableView {
     const thumbnailContainer = (this.div = document.createElement("div"));
     thumbnailContainer.className = "thumbnail";
     thumbnailContainer.setAttribute("page-number", id);
-    thumbnailContainer.setAttribute("page-id", id);
 
     const imageContainer = (this.imageContainer =
       document.createElement("div"));
