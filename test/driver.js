@@ -803,6 +803,10 @@ class Driver {
             }
 
             task.pdfDoc = doc;
+            if (!task.save && task.print && task.annotationStorage) {
+              doc.annotationStorage._setValues(task.annotationStorage);
+              task.printAnnotationStorage = doc.annotationStorage.print;
+            }
             task.optionalContentConfigPromise = doc.getOptionalContentConfig({
               intent: task.print ? "print" : "display",
             });
@@ -969,7 +973,7 @@ class Driver {
               pageColors = null,
               partialCrop = null;
 
-            if (task.annotationStorage) {
+            if (!task.print && task.annotationStorage) {
               task.pdfDoc.annotationStorage._setValues(task.annotationStorage);
             }
 
@@ -1079,6 +1083,8 @@ class Driver {
             } else if (renderPrint) {
               if (task.annotationStorage) {
                 renderContext.annotationMode = AnnotationMode.ENABLE_STORAGE;
+                renderContext.printAnnotationStorage =
+                  task.printAnnotationStorage;
               }
               renderContext.intent = "print";
             }
