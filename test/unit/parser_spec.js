@@ -94,13 +94,11 @@ describe("parser", function () {
         expect(lexer.getNumber()).toEqual(11.234);
       });
 
-      it("should parse PostScript numbers", function () {
+      it("should parse PDF numbers", function () {
         const numbers = [
           "-.002",
           "34.5",
           "-3.62",
-          "123.6e10",
-          "1E-5",
           "-1.",
           "0.0",
           "123",
