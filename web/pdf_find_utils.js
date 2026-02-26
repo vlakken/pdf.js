@@ -140,6 +140,9 @@ function getNormalizeWithNFKC() {
     const diacriticsRegex = /^\p{M}$/u;
     // Some chars must be replaced by their NFKC counterpart during a search.
     for (let i = 0; i < 65536; i++) {
+      if (i >= 0xd800 && i <= 0xdfff) {
+        continue; // Skip surrogates since they're not valid Unicode scalar values.
+      }
       const c = String.fromCharCode(i);
       if (c.normalize("NFKC") !== c && !diacriticsRegex.test(c)) {
         if (range.length !== 2) {
