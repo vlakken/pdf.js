@@ -5,6 +5,7 @@ import {
   kbFocusNext,
   loadAndWait,
   PDI,
+  showViewsManager,
 } from "./test_utils.mjs";
 
 function waitForThumbnailVisible(page, pageNum) {
@@ -26,23 +27,6 @@ async function waitForMenu(page, buttonSelector, visible = true) {
     {},
     buttonSelector,
     visible
-  );
-}
-
-async function showViewsManager(page) {
-  const hasAnimations = await page.evaluate(
-    () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-  await page.click("#viewsManagerToggleButton");
-  if (hasAnimations) {
-    await page.waitForSelector("#outerContainer.viewsManagerMoving", {
-      visible: true,
-    });
-  }
-  await page.waitForSelector("#viewsManager", { visible: true });
-  await page.waitForSelector(
-    "#outerContainer:not(.viewsManagerMoving).viewsManagerOpen",
-    { visible: true }
   );
 }
 

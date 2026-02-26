@@ -28,24 +28,13 @@ import {
   kbDelete,
   loadAndWait,
   scrollIntoView,
+  showViewsManager,
   waitAndClick,
   waitForDOMMutation,
 } from "./test_utils.mjs";
 
 async function waitForThumbnailVisible(page, pageNums) {
-  const hasAnimations = await page.evaluate(
-    () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-  await page.click("#viewsManagerToggleButton");
-  if (hasAnimations) {
-    await page.waitForSelector("#outerContainer.viewsManagerMoving", {
-      visible: true,
-    });
-  }
-  await page.waitForSelector(
-    "#outerContainer:not(.viewsManagerMoving).viewsManagerOpen",
-    { visible: true }
-  );
+  await showViewsManager(page);
 
   const thumbSelector = "#thumbnailsView .thumbnailImageContainer > img";
   await page.waitForSelector(thumbSelector, { visible: true });
