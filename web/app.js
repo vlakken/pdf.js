@@ -604,6 +604,7 @@ const PDFViewerApplication = {
         enableHWA,
         enableSplitMerge: AppOptions.get("enableSplitMerge"),
         manageMenu: appConfig.viewsManager.manageMenu,
+        addFileButton: appConfig.viewsManager.viewsManagerAddFileButton,
       });
       renderingQueue.setThumbnailViewer(this.pdfThumbnailViewer);
     }

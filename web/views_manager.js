@@ -86,6 +86,7 @@ class ViewsManager extends Sidebar {
       outlinesView,
       attachmentsView,
       layersView,
+      viewsManagerAddFileButton,
       viewsManagerCurrentOutlineButton,
       viewsManagerSelectorButton,
       viewsManagerSelectorOptions,
@@ -131,6 +132,7 @@ class ViewsManager extends Sidebar {
     this.attachmentsView = attachmentsView;
     this.layersView = layersView;
 
+    this.viewsManagerAddFileButton = viewsManagerAddFileButton;
     this.viewsManagerCurrentOutlineButton = viewsManagerCurrentOutlineButton;
     this.viewsManagerHeaderLabel = viewsManagerHeaderLabel;
     this.viewsManagerStatus = viewsManagerStatus;
@@ -248,6 +250,7 @@ class ViewsManager extends Sidebar {
     }
 
     this.viewsManagerStatus.hidden = view !== SidebarView.THUMBS;
+    this.viewsManagerAddFileButton.hidden = view !== SidebarView.THUMBS;
     this.viewsManagerCurrentOutlineButton.hidden = view !== SidebarView.OUTLINE;
     this.viewsManagerHeaderLabel.setAttribute(
       "data-l10n-id",

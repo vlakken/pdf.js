@@ -245,10 +245,11 @@
     flex: 0 0 auto;
 
     .viewsManagerLabel {
-      flex: 1 0 0;
+      flex: 0;
       color: var(--text-color);
       text-align: center;
       height: fit-content;
+      width: fit-content;
       user-select: none;
 
       font: menu;
@@ -336,6 +337,8 @@
       }
 
       #viewsManagerAddFileButton {
+        visibility: hidden;
+
         background: var(--button-no-bg);
         width: 32px;
         height: 32px;
