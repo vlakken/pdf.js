@@ -131,7 +131,7 @@ class BaseTreeViewer {
         target.classList.toggle("treeItemsHidden");
         if (e.shiftKey) {
           const shouldShowAll = !target.classList.contains("treeItemsHidden");
-          this._toggleTreeItem(this.container, shouldShowAll);
+          this._toggleTreeItem(target.parentNode, shouldShowAll);
         }
       });
     }
