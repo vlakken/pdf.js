@@ -23,7 +23,7 @@
   &.viewsManagerOpen {
     #viewsManager {
       visibility: visible;
-      inset-inline-start: 1px;
+      inset-inline-start: 8px;
     }
 
     #viewerContainer:not(.pdfPresentationMode) {
@@ -53,7 +53,7 @@
   --pages-selected-icon: url(images/pages_selected.svg);
   --spinner-icon: url(images/altText_spinner.svg);
 
-  --sidebar-bg-color: light-dark(rgb(255 255 255 / 0.92), rgb(35 34 43 / 0.92));
+  --sidebar-bg-color: light-dark(rgb(255 255 255 / 0.92), rgb(66 65 77 / 0.92));
   --sidebar-backdrop-filter: blur(7px);
   --sidebar-width: 230px;
   --sidebar-min-width: min-content;
@@ -86,13 +86,14 @@
   --header-shadow:
     0 0.25px 0.75px -0.75px light-dark(rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.2)),
     0 2px 6px -6px light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.4));
+  --header-bg: light-dark(rgb(255 255 255 / 0.92), #42414e);
   --image-outline: none;
   --image-border-width: 6px;
   --image-border-color: light-dark(#cfcfd8, #3a3944);
   --image-hover-border-color: #bfbfc9;
   --image-current-border-color: var(--button-focus-outline-color);
   --image-current-focused-outline-color: var(--image-hover-border-color);
-  --image-page-number-bg: light-dark(#f0f0f4, #23222b);
+  --image-page-number-bg: light-dark(#f0f0f4, #42414d);
   --image-page-number-fg: var(--text-color);
   --image-page-number-border-color: transparent;
   --image-hover-page-number-bg: var(--image-page-number-bg);
@@ -243,6 +244,7 @@
     width: 100%;
     box-shadow: var(--header-shadow);
     flex: 0 0 auto;
+    background-color: var(--header-bg);
 
     .viewsManagerLabel {
       flex: 1 0 0;

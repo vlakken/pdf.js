@@ -1360,9 +1360,13 @@ dialog :link {
       height: 1px;
     }
 
-    #toolbarViewerLeft #numPages.toolbarLabel {
-      padding-inline-start: 3px;
-      flex: none;
+    #toolbarViewerLeft {
+      margin-inline-start: 8px;
+
+      #numPages.toolbarLabel {
+        padding-inline-start: 3px;
+        flex: none;
+      }
     }
   }
 
