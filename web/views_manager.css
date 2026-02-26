@@ -189,7 +189,7 @@
   transition-timing-function: var(--sidebar-transition-timing-function);
 
   .sidebarResizer {
-    inset-inline-start: 100%;
+    inset-inline-start: calc(100% + 4px);
   }
 
   .viewsManagerButton {
