@@ -1898,6 +1898,7 @@ class PDFPageProxy {
         annotationStorage: map,
         modifiedIds,
       },
+      /* queueingStrategy = */ undefined,
       transfer
     );
     const reader = readableStream.getReader();
