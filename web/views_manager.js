@@ -69,6 +69,9 @@ const UI_NOTIFICATION_CLASS = "pdfSidebarNotification";
 class ViewsManager extends Sidebar {
   static #l10nDescription = null;
 
+  #hasAnimations = !window.matchMedia("(prefers-reduced-motion: reduce)")
+    .matches;
+
   /**
    * @param {PDFSidebarOptions} options
    */
@@ -303,15 +306,20 @@ class ViewsManager extends Sidebar {
     toggleExpandedBtn(this.toggleButton, true);
     this.switchView(this.active);
 
-    // Changing `hidden` above may cause a reflow which would prevent the
-    // CSS transition from being applied correctly, so we need to delay
-    // adding the relevant CSS classes.
-    queueMicrotask(() => {
-      this.outerContainer.classList.add(
-        "viewsManagerMoving",
-        "viewsManagerOpen"
-      );
-    });
+    if (this.#hasAnimations) {
+      // Changing `hidden` above may cause a reflow which would prevent the
+      // CSS transition from being applied correctly, so we need to delay
+      // adding the relevant CSS classes.
+      queueMicrotask(() => {
+        this.outerContainer.classList.add(
+          "viewsManagerMoving",
+          "viewsManagerOpen"
+        );
+      });
+    } else {
+      this.outerContainer.classList.add("viewsManagerOpen");
+      this.eventBus.dispatch("resize", { source: this });
+    }
     if (this.active === SidebarView.THUMBS) {
       this.onUpdateThumbnails();
     }
@@ -392,13 +400,16 @@ class ViewsManager extends Sidebar {
   #addEventListeners() {
     const { eventBus, outerContainer } = this;
 
-    this.sidebarContainer.addEventListener("transitionend", evt => {
-      if (evt.target === this.sidebarContainer) {
-        outerContainer.classList.remove("viewsManagerMoving");
-        // Ensure that rendering is triggered after opening/closing the sidebar.
-        eventBus.dispatch("resize", { source: this });
-      }
-    });
+    if (this.#hasAnimations) {
+      this.sidebarContainer.addEventListener("transitionend", evt => {
+        if (evt.target === this.sidebarContainer) {
+          outerContainer.classList.remove("viewsManagerMoving");
+          // Ensure that rendering is triggered after opening/closing the
+          // sidebar.
+          eventBus.dispatch("resize", { source: this });
+        }
+      });
+    }
 
     // Buttons for switching views.
     this.thumbnailButton.addEventListener("click", () => {
