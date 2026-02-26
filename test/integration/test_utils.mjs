@@ -262,7 +262,7 @@ function getAnnotationSelector(id) {
 }
 
 function getThumbnailSelector(pageNumber) {
-  return `.thumbnailImageContainer[data-l10n-args='{"page":${pageNumber}}']`;
+  return `.thumbnailImageContainer[data-l10n-args^='{"page":${pageNumber}']`;
 }
 
 async function getSpanRectFromText(page, pageNumber, text) {
@@ -645,6 +645,7 @@ function waitForEditorMovedInDOM(page) {
 }
 
 async function scrollIntoView(page, selector) {
+  await page.waitForSelector(selector, { visible: true });
   const handle = await page.evaluateHandle(
     sel => [
       new Promise(resolve => {
@@ -982,6 +983,9 @@ async function showViewsManager(page) {
     "#outerContainer:not(.viewsManagerMoving).viewsManagerOpen",
     { visible: true }
   );
+  await page.waitForSelector("#viewsManagerStatusActionButton:not(:disabled)", {
+    visible: true,
+  });
 }
 
 // Unicode bidi isolation characters, Fluent adds these markers to the text.
