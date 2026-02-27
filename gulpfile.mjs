@@ -2252,6 +2252,21 @@ gulp.task("importl10n", async function () {
   await downloadL10n(L10N_DIR);
 });
 
+gulp.task("check_l10n", function (done) {
+  console.log("\n### Checking for unused l10n IDs");
+
+  const checkProcess = startNode(["external/check_l10n/check_l10n.mjs"], {
+    stdio: "inherit",
+  });
+  checkProcess.on("close", function (code) {
+    if (code !== 0) {
+      done(new Error("check_l10n failed."));
+      return;
+    }
+    done();
+  });
+});
+
 function ghPagesPrepare() {
   console.log("\n### Creating web site");
 
