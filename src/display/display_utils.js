@@ -377,10 +377,9 @@ function getPdfFilenameFromUrl(url, defaultFilename = "document.pdf") {
       let decoded = decodeURIComponent(name);
       if (decoded.includes("/")) {
         decoded = stripPath(decoded);
-        if (decoded.test(/^\.pdf$/i)) {
-          return decoded;
+        if (/^\.pdf$/i.test(decoded)) {
+          return name;
         }
-        return name;
       }
       return decoded;
     } catch {
