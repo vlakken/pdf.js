@@ -13964,5 +13964,12 @@
     "firstPage": 171,
     "lastPage": 171,
     "type": "eq"
+  },
+  {
+    "id": "sci-notation",
+    "file": "pdfs/sci-notation.pdf",
+    "md5": "ead167e0328f1a1f4f8901cee501a9c4",
+    "rounds": 1,
+    "type": "eq"
   }
 ]
