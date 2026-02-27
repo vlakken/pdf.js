@@ -964,6 +964,26 @@ async function highlightSpan(
   await page.waitForSelector(getEditorSelector(nextId));
 }
 
+async function showViewsManager(page) {
+  const hasAnimations = await page.evaluate(
+    () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  const movingPromise = hasAnimations
+    ? page.waitForSelector("#outerContainer.viewsManagerMoving", {
+        visible: true,
+      })
+    : Promise.resolve();
+  await page.click("#viewsManagerToggleButton");
+  if (hasAnimations) {
+    await movingPromise;
+  }
+  await page.waitForSelector("#viewsManager", { visible: true });
+  await page.waitForSelector(
+    "#outerContainer:not(.viewsManagerMoving).viewsManagerOpen",
+    { visible: true }
+  );
+}
+
 // Unicode bidi isolation characters, Fluent adds these markers to the text.
 const FSI = "\u2068";
 const PDI = "\u2069";
@@ -1030,6 +1050,7 @@ export {
   selectEditors,
   serializeBitmapDimensions,
   setCaretAt,
+  showViewsManager,
   switchToEditor,
   unselectEditor,
   waitAndClick,

@@ -21,6 +21,7 @@ import {
   getSpanRectFromText,
   loadAndWait,
   scrollIntoView,
+  showViewsManager,
   waitForPageChanging,
   waitForPageRendered,
 } from "./test_utils.mjs";
@@ -1446,6 +1447,82 @@ describe("PDF viewer", () => {
             ).find(span => span.textContent.includes("type-stable"))
           );
           expect(await spanHandle.isIntersectingViewport()).toBeTrue();
+        })
+      );
+    });
+  });
+
+  describe("Outline tree shift-click toggle (PR 20740)", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait(
+        "nested_outline.pdf",
+        "#viewsManagerToggleButton"
+      );
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("should only toggle the clicked item's subtree, not the whole outline", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          // Open the sidebar.
+          await showViewsManager(page);
+
+          // Switch to outline view.
+          await page.click("#viewsManagerSelectorButton");
+          await page.waitForSelector("#outlinesViewMenu", { visible: true });
+          await page.click("#outlinesViewMenu");
+
+          // Wait for the outline tree to render with nesting (toggle buttons).
+          await page.waitForSelector("#outlinesView.withNesting");
+
+          // Initially all three top-level togglers must be expanded.
+          const initialHiddenCount = await page.$$eval(
+            "#outlinesView > .treeItem > .treeItemToggler",
+            togglers =>
+              togglers.filter(t => t.classList.contains("treeItemsHidden"))
+                .length
+          );
+          expect(initialHiddenCount).withContext(`In ${browserName}`).toBe(0);
+
+          // Shift-click the first top-level toggler (section "1. Introduction")
+          // to collapse only its subtree.
+          // The toggler has width/height 0 (visual content via ::before), so
+          // we dispatch the MouseEvent directly rather than using page.click().
+          await page.evaluate(() => {
+            const toggler = document.querySelector(
+              "#outlinesView > .treeItem:nth-child(1) > .treeItemToggler"
+            );
+            toggler.dispatchEvent(
+              new MouseEvent("click", {
+                shiftKey: true,
+                bubbles: true,
+                cancelable: true,
+              })
+            );
+          });
+
+          // Section 1's toggler must now be collapsed.
+          const section1Collapsed = await page.$eval(
+            "#outlinesView > .treeItem:nth-child(1) > .treeItemToggler",
+            t => t.classList.contains("treeItemsHidden")
+          );
+          expect(section1Collapsed).withContext(`In ${browserName}`).toBeTrue();
+
+          // Sections 2 and 3 must remain expanded (the bug collapsed the whole
+          // outline by passing `this.container` instead of
+          // `target.parentNode`).
+          const otherHiddenCount = await page.$$eval(
+            "#outlinesView > .treeItem:nth-child(n+2) > .treeItemToggler",
+            togglers =>
+              togglers.filter(t => t.classList.contains("treeItemsHidden"))
+                .length
+          );
+          expect(otherHiddenCount).withContext(`In ${browserName}`).toBe(0);
         })
       );
     });
