@@ -70,7 +70,8 @@ const SPACE_FOR_DRAG_MARKER_WHEN_NO_NEXT_ELEMENT = 15;
  *   The default value is `false`.
  * @property {Object} [manageMenu] - The menu elements to manage saving edited
  *   PDF.
- */
+ * @property {HTMLButtonElement} addFileButton - The button that opens a dialog
+ *   to add a PDF file to merge with the current one.
 
 /**
  * Viewer control to display thumbnails for pages in a PDF document.
@@ -141,6 +142,7 @@ class PDFThumbnailViewer {
     enableHWA,
     enableSplitMerge,
     manageMenu,
+    addFileButton,
   }) {
     this.scrollableContainer = container.parentElement;
     this.container = container;
@@ -152,6 +154,8 @@ class PDFThumbnailViewer {
     this.pageColors = pageColors || null;
     this.enableHWA = enableHWA || false;
     this.#enableSplitMerge = enableSplitMerge || false;
+    // TODO: uncomment when the "add file" feature is implemented.
+    // this.#addFileButton = addFileButton;
 
     if (this.#enableSplitMerge && manageMenu) {
       const { button, menu, copy, cut, delete: del, saveAs } = manageMenu;

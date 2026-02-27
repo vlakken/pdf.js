@@ -262,7 +262,7 @@ function getAnnotationSelector(id) {
 }
 
 function getThumbnailSelector(pageNumber) {
-  return `.thumbnailImageContainer[data-l10n-args='{"page":${pageNumber}}']`;
+  return `.thumbnailImageContainer[data-l10n-args^='{"page":${pageNumber}']`;
 }
 
 async function getSpanRectFromText(page, pageNumber, text) {
@@ -645,6 +645,7 @@ function waitForEditorMovedInDOM(page) {
 }
 
 async function scrollIntoView(page, selector) {
+  await page.waitForSelector(selector, { visible: true });
   const handle = await page.evaluateHandle(
     sel => [
       new Promise(resolve => {
@@ -964,6 +965,29 @@ async function highlightSpan(
   await page.waitForSelector(getEditorSelector(nextId));
 }
 
+async function showViewsManager(page) {
+  const hasAnimations = await page.evaluate(
+    () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  const movingPromise = hasAnimations
+    ? page.waitForSelector("#outerContainer.viewsManagerMoving", {
+        visible: true,
+      })
+    : Promise.resolve();
+  await page.click("#viewsManagerToggleButton");
+  if (hasAnimations) {
+    await movingPromise;
+  }
+  await page.waitForSelector("#viewsManager", { visible: true });
+  await page.waitForSelector(
+    "#outerContainer:not(.viewsManagerMoving).viewsManagerOpen",
+    { visible: true }
+  );
+  await page.waitForSelector("#viewsManagerStatusActionButton:not(:disabled)", {
+    visible: true,
+  });
+}
+
 // Unicode bidi isolation characters, Fluent adds these markers to the text.
 const FSI = "\u2068";
 const PDI = "\u2069";
@@ -1030,6 +1054,7 @@ export {
   selectEditors,
   serializeBitmapDimensions,
   setCaretAt,
+  showViewsManager,
   switchToEditor,
   unselectEditor,
   waitAndClick,

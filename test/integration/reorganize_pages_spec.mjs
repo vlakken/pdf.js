@@ -28,12 +28,13 @@ import {
   kbDelete,
   loadAndWait,
   scrollIntoView,
+  showViewsManager,
   waitAndClick,
   waitForDOMMutation,
 } from "./test_utils.mjs";
 
 async function waitForThumbnailVisible(page, pageNums) {
-  await page.click("#viewsManagerToggleButton");
+  await showViewsManager(page);
 
   const thumbSelector = "#thumbnailsView .thumbnailImageContainer > img";
   await page.waitForSelector(thumbSelector, { visible: true });
@@ -283,12 +284,12 @@ describe("Reorganize Pages View", () => {
           await waitForThumbnailVisible(page, 1);
           const rect1 = await getRect(page, getThumbnailSelector(1));
           const rect2 = await getRect(page, getThumbnailSelector(2));
-          await (await page.$(".thumbnail[page-id='14'")).scrollIntoView();
+          await (await page.$(".thumbnail[page-number='14'")).scrollIntoView();
           await page.waitForSelector(getThumbnailSelector(14), {
             visible: true,
           });
           await page.click(`.thumbnail:has(${getThumbnailSelector(14)}) input`);
-          await (await page.$(".thumbnail[page-id='1'")).scrollIntoView();
+          await (await page.$(".thumbnail[page-number='1'")).scrollIntoView();
           await page.waitForSelector(getThumbnailSelector(1), {
             visible: true,
           });
