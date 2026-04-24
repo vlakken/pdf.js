@@ -40,10 +40,7 @@ import Metalsmith from "metalsmith";
 import ordered from "ordered-read-streams";
 import path from "path";
 import postcss from "gulp-postcss";
-import postcssDirPseudoClass from "postcss-dir-pseudo-class";
 import postcssDiscardComments from "postcss-discard-comments";
-import postcssLightDarkFunction from "@csstools/postcss-light-dark-function";
-import postcssNesting from "postcss-nesting";
 import { preprocess } from "./external/builder/builder.mjs";
 import relative from "metalsmith-html-relative";
 import rename from "gulp-rename";
@@ -91,9 +88,9 @@ const config = JSON.parse(fs.readFileSync(CONFIG_FILE).toString());
 
 const ENV_TARGETS = [
   "last 2 versions",
-  "Chrome >= 118",
+  "Chrome >= 125",
   "Firefox ESR",
-  "Safari >= 16.4",
+  "Safari >= 18",
   "Node >= 22",
   "> 1%",
   "not IE > 0",
@@ -1246,15 +1243,7 @@ function buildGeneric(defines, dir) {
 
     preprocessHTML("web/viewer.html", defines).pipe(gulp.dest(dir + "web")),
     preprocessCSS("web/viewer.css", defines)
-      .pipe(
-        postcss([
-          postcssDirPseudoClass(),
-          discardCommentsCSS(),
-          postcssNesting(),
-          postcssLightDarkFunction({ preserve: true }),
-          autoprefixer(AUTOPREFIXER_CONFIG),
-        ])
-      )
+      .pipe(postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)]))
       .pipe(gulp.dest(dir + "web")),
 
     gulp
@@ -1314,15 +1303,7 @@ function buildComponents(defines, dir) {
       .src(COMPONENTS_IMAGES, { encoding: false })
       .pipe(gulp.dest(dir + "images")),
     preprocessCSS("web/pdf_viewer.css", defines)
-      .pipe(
-        postcss([
-          postcssDirPseudoClass(),
-          discardCommentsCSS(),
-          postcssNesting(),
-          postcssLightDarkFunction({ preserve: true }),
-          autoprefixer(AUTOPREFIXER_CONFIG),
-        ])
-      )
+      .pipe(postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)]))
       .pipe(gulp.dest(dir)),
   ]);
 }
@@ -1651,13 +1632,7 @@ gulp.task(
         ),
         preprocessCSS("web/viewer.css", defines)
           .pipe(
-            postcss([
-              postcssDirPseudoClass(),
-              discardCommentsCSS(),
-              postcssNesting(),
-              postcssLightDarkFunction({ preserve: true }),
-              autoprefixer(AUTOPREFIXER_CONFIG),
-            ])
+            postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)])
           )
           .pipe(gulp.dest(CHROME_BUILD_CONTENT_DIR + "web")),
 
@@ -2584,15 +2559,7 @@ function buildInternalViewer(defines, dir) {
       gulp.dest(dir + "web")
     ),
     preprocessCSS("web/internal/debugger.css", defines)
-      .pipe(
-        postcss([
-          postcssDirPseudoClass(),
-          discardCommentsCSS(),
-          postcssNesting(),
-          postcssLightDarkFunction({ preserve: true }),
-          autoprefixer(AUTOPREFIXER_CONFIG),
-        ])
-      )
+      .pipe(postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)]))
       .pipe(gulp.dest(dir + "web")),
     createCMapBundle().pipe(gulp.dest(dir + "web/cmaps")),
     createICCBundle().pipe(gulp.dest(dir + "web/iccs")),
