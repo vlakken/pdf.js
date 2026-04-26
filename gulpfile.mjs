@@ -2293,6 +2293,7 @@ gulp.task("lint", function (done) {
     "node_modules/eslint/bin/eslint",
     ".",
     "--report-unused-disable-directives",
+    "--concurrency=auto",
   ];
   if (process.argv.includes("--fix")) {
     esLintOptions.push("--fix");
@@ -2307,9 +2308,11 @@ gulp.task("lint", function (done) {
     styleLintOptions.push("--fix");
   }
 
+  // JSON files are intentionally not passed to Prettier here: ESLint already
+  // formats them via its prettier/prettier rule (with identical output), and
+  // running both in parallel would race on writes in --fix mode.
   const prettierOptions = [
     "node_modules/prettier/bin/prettier.cjs",
-    "**/*.json",
     "**/*.html",
   ];
   if (process.argv.includes("--fix")) {
@@ -2325,40 +2328,28 @@ gulp.task("lint", function (done) {
     "--no-summary",
   ];
 
-  const esLintProcess = startNode(esLintOptions, { stdio: "inherit" });
-  esLintProcess.on("close", function (esLintCode) {
-    if (esLintCode !== 0) {
-      done(new Error("ESLint failed."));
+  function runLinter(name, options) {
+    return new Promise(resolve => {
+      const proc = startNode(options, { stdio: "inherit" });
+      proc.on("close", code => {
+        resolve(code === 0 ? null : name);
+      });
+    });
+  }
+
+  Promise.all([
+    runLinter("ESLint", esLintOptions),
+    runLinter("Stylelint", styleLintOptions),
+    runLinter("Prettier", prettierOptions),
+    runLinter("svglint", svgLintOptions),
+  ]).then(results => {
+    const failures = results.filter(Boolean);
+    if (failures.length) {
+      done(new Error(`${failures.join(", ")} failed.`));
       return;
     }
 
-    const styleLintProcess = startNode(styleLintOptions, { stdio: "inherit" });
-    styleLintProcess.on("close", function (styleLintCode) {
-      if (styleLintCode !== 0) {
-        done(new Error("Stylelint failed."));
-        return;
-      }
-
-      const prettierProcess = startNode(prettierOptions, { stdio: "inherit" });
-      prettierProcess.on("close", function (prettierCode) {
-        if (prettierCode !== 0) {
-          done(new Error("Prettier failed."));
-          return;
-        }
-
-        const svgLintProcess = startNode(svgLintOptions, {
-          stdio: "inherit",
-        });
-        svgLintProcess.on("close", function (svgLintCode) {
-          if (svgLintCode !== 0) {
-            done(new Error("svglint failed."));
-            return;
-          }
-
-          gulp.task("lint-licenses")(done);
-        });
-      });
-    });
+    gulp.task("lint-licenses")(done);
   });
 });
 
