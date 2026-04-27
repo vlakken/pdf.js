@@ -1495,6 +1495,9 @@ class Catalog {
           if (!kids) {
             return null;
           }
+          if (!Array.isArray(kids)) {
+            throw new FormatError("Kids must be an array.");
+          }
 
           const kidPromises = [];
           let found = false;
@@ -1512,11 +1515,15 @@ class Catalog {
                   throw new FormatError("Kid node must be a dictionary.");
                 }
                 if (obj.has("Count")) {
-                  total += obj.get("Count");
-                } else {
-                  // Page leaf node.
-                  total++;
+                  const count = obj.get("Count");
+                  if (Number.isInteger(count) && count >= 0) {
+                    total += count;
+                    return;
+                  }
+                  throw new FormatError("Count must be a (positive) integer.");
                 }
+                // Page leaf node.
+                total++;
               })
             );
           }
