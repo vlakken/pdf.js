@@ -42,6 +42,9 @@
 
 import { GlobalWorkerOptions } from "pdfjs/display/worker_options.js";
 import { isNodeJS } from "../../src/shared/util.js";
+import { mergeWorkerCoverageIntoWindow } from "../coverage_utils.js";
+import { MessageHandler } from "pdfjs/shared/message_handler.js";
+import { PDFWorker } from "pdfjs/display/api.js";
 import { TestReporter } from "../reporter.js";
 
 async function initializePDFJS(callback) {
@@ -114,10 +117,64 @@ async function initializePDFJS(callback) {
       "The `gulp unittest` command cannot be used in Node.js environments."
     );
   }
-  // Configure the worker.
-  GlobalWorkerOptions.workerSrc = "../../build/generic/build/pdf.worker.mjs";
+  // Configure the worker. Point at the raw source so the webserver can
+  // instrument it on request and the worker accumulates `__coverage__`.
+  GlobalWorkerOptions.workerSrc = "../../src/pdf.worker.js";
 
   callback();
+}
+
+// Each unit-test typically spins up its own `PDFWorker`, which is destroyed
+// when the loading task is. Hook `destroy` so that we extract the worker-side
+// `__coverage__` before terminating, and merge it into the main thread's
+// `window.__coverage__`. Without this, anything tested through `getDocument`
+// → worker (most of `core/`) has its execution counts dropped on the floor.
+const pendingWorkerCoverage = new Set();
+
+function installWorkerCoverageHook() {
+  if (!window.__coverage__) {
+    return;
+  }
+  const originalDestroy = PDFWorker.prototype.destroy;
+  PDFWorker.prototype.destroy = function () {
+    if (this.destroyed || !this._webWorker) {
+      // Already torn down, or wrapping a foreign port — defer to the original
+      // implementation, which leaves the underlying `Worker` alone.
+      return originalDestroy.call(this);
+    }
+    // Capture the underlying Worker, then run the original destroy with
+    // `terminate` neutralized so the public `destroyed`/`port` contract is
+    // preserved synchronously while the Worker stays alive long enough to
+    // hand back its `__coverage__`.
+    const webWorker = this._webWorker;
+    const realTerminate = webWorker.terminate.bind(webWorker);
+    webWorker.terminate = () => {};
+    try {
+      originalDestroy.call(this);
+    } finally {
+      webWorker.terminate = realTerminate;
+    }
+    const handler = new MessageHandler("main", "worker", webWorker);
+    const promise = handler
+      .sendWithPromise("GetWorkerCoverage", null)
+      .then(mergeWorkerCoverageIntoWindow)
+      .catch(e => {
+        console.warn(`Failed to collect worker coverage: ${e}`);
+      })
+      .finally(() => {
+        handler.destroy();
+        realTerminate();
+        pendingWorkerCoverage.delete(promise);
+      });
+    pendingWorkerCoverage.add(promise);
+    return undefined;
+  };
+}
+
+async function flushPendingWorkerCoverage() {
+  while (pendingWorkerCoverage.size > 0) {
+    await Promise.allSettled(pendingWorkerCoverage);
+  }
 }
 
 (function () {
@@ -140,6 +197,13 @@ async function initializePDFJS(callback) {
 
   env.addReporter(htmlReporter);
 
+  if (window.__coverage__) {
+    // Must run before `TestReporter`, whose `jasmineDone` triggers the
+    // browser teardown; the worker-side counters need to be merged into
+    // `window.__coverage__` before the page is closed.
+    env.addReporter({ jasmineDone: flushPendingWorkerCoverage });
+  }
+
   if (urls.queryString.getParam("browser")) {
     const testReporter = new TestReporter(urls.queryString.getParam("browser"));
     env.addReporter(testReporter);
@@ -157,6 +221,7 @@ async function initializePDFJS(callback) {
 
   function unitTestInit() {
     initializePDFJS(function () {
+      installWorkerCoverageHook();
       env.execute();
     });
   }

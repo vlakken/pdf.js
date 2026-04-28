@@ -14,6 +14,8 @@
  */
 /* globals pdfjsLib, _pdfjsTestingUtils, pdfjsViewer */
 
+import { fetchAndMergeWorkerCoverage } from "./coverage_utils.js";
+
 const {
   AnnotationLayer,
   AnnotationMode,
@@ -1531,39 +1533,7 @@ class Driver {
   }
 
   async _collectWorkerCoverage() {
-    try {
-      const workerCoverage =
-        await this.#pdfWorker.messageHandler.sendWithPromise(
-          "GetWorkerCoverage",
-          null
-        );
-      if (workerCoverage && Object.keys(workerCoverage).length > 0) {
-        window.__coverage__ ??= {};
-        for (const [key, fileCoverage] of Object.entries(workerCoverage)) {
-          if (window.__coverage__[key]) {
-            // Istanbul coverage objects use s (statements), b (branches), and
-            // f (functions) as shorthand keys for the hit-count maps.
-            for (const id of Object.keys(fileCoverage.s)) {
-              window.__coverage__[key].s[id] =
-                (window.__coverage__[key].s[id] ?? 0) + fileCoverage.s[id];
-            }
-            for (const id of Object.keys(fileCoverage.b)) {
-              window.__coverage__[key].b[id] = fileCoverage.b[id].map(
-                (c, i) => (window.__coverage__[key].b[id]?.[i] ?? 0) + c
-              );
-            }
-            for (const id of Object.keys(fileCoverage.f)) {
-              window.__coverage__[key].f[id] =
-                (window.__coverage__[key].f[id] ?? 0) + fileCoverage.f[id];
-            }
-          } else {
-            window.__coverage__[key] = fileCoverage;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn(`Failed to collect worker coverage: ${e}`);
-    }
+    await fetchAndMergeWorkerCoverage(this.#pdfWorker);
     this.#pdfWorker.destroy();
     this.#pdfWorker = null;
   }
