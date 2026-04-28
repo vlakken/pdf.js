@@ -24,13 +24,19 @@ permissions:
 
 jobs:
   test:
-    name: Test
+    name: ${{ matrix.os }} / ${{ matrix.browser }}
 
     strategy:
       fail-fast: false
       matrix:
         node-version: [lts/*]
         os: [windows-latest, ubuntu-latest]
+        browser: [firefox, chrome]
+        include:
+          - browser: firefox
+            skip: --noChrome
+          - browser: chrome
+            skip: --noFirefox
 
     runs-on: ${{ matrix.os }}
     environment: code-coverage
@@ -62,7 +68,7 @@ jobs:
         run: pip install -r .github/font_tests_requirements.txt
 
       - name: Run font tests with code coverage
-        run: npx gulp fonttest --headless --coverage --coverage-output build/coverage/font
+        run: npx gulp fonttest --headless --coverage --coverage-output build/coverage/font ${{ matrix.skip }}
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
