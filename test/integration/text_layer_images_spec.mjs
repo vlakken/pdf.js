@@ -347,4 +347,53 @@ describe("Text layer images", () => {
       );
     });
   });
+
+  describe("free-highlighting on a page with no images", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait(
+        "empty.pdf",
+        `.page[data-page-number = "1"] .textLayerImages`,
+        undefined,
+        undefined,
+        {
+          imagesRightClickMinSize: 16,
+          highlightEditorColors: "yellow=#FFFF00",
+        },
+        { width: 800, height: 600, devicePixelRatio: 1 }
+      );
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must create a free highlight when dragging on the empty image container", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToHighlight(page);
+
+          const rect = await getRect(
+            page,
+            `.page[data-page-number="1"] > .textLayer > .textLayerImages`
+          );
+
+          const x1 = rect.x + rect.width / 4;
+          const y1 = rect.y + rect.height / 4;
+          const x2 = rect.x + (3 * rect.width) / 4;
+          const y2 = rect.y + (3 * rect.height) / 4;
+
+          const clickHandle = await waitForPointerUp(page);
+          await page.mouse.move(x1, y1);
+          await page.mouse.down();
+          await page.mouse.move(x2, y2);
+          await page.mouse.up();
+          await awaitPromise(clickHandle);
+
+          await page.waitForSelector(getEditorSelector(0));
+        })
+      );
+    });
+  });
 });
