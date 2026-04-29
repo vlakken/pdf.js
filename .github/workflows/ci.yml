@@ -7,6 +7,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    environment: code-coverage
 
     strategy:
       fail-fast: false
@@ -41,8 +42,8 @@ jobs:
       - name: Run external tests
         run: npx gulp externaltest
 
-      - name: Run CLI unit tests
-        run: npx gulp unittestcli
+      - name: Run CLI unit tests with code coverage
+        run: npx gulp unittestcli --coverage --coverage-output build/coverage/unitcli
 
       - name: Save cached PDF files
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -50,3 +51,13 @@ jobs:
           path: test/pdfs/*.pdf
           key: cached-pdf-files-${{ hashFiles('test/pdfs/*.pdf') }}
           enableCrossOsArchive: true
+
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          files: ./build/coverage/unitcli/lcov.info
+          flags: unittestcli
+          name: codecov-umbrella
+          verbose: true
