@@ -15,6 +15,7 @@
 
 /* eslint-disable no-console */
 
+import { TEST_PASSED, TEST_UNEXPECTED_FAIL } from "../color_utils.mjs";
 import Jasmine from "jasmine";
 
 async function runTests(results) {
@@ -50,6 +51,13 @@ async function runTests(results) {
     ],
   });
 
+  function failureError(result) {
+    return result.failedExpectations
+      ?.map(item => item.message)
+      .filter(Boolean)
+      .join(" ");
+  }
+
   jasmine.addReporter({
     jasmineDone(suiteInfo) {},
     jasmineStarted(suiteInfo) {},
@@ -62,10 +70,17 @@ async function runTests(results) {
       // Report on passed or failed tests.
       ++results.runs;
       if (result.status === "passed") {
-        console.log(`TEST-PASSED | ${result.description}`);
+        console.log(`${TEST_PASSED} | ${result.description}`);
       } else {
         ++results.failures;
-        console.log(`TEST-UNEXPECTED-FAIL | ${result.description}`);
+        const error = failureError(result);
+        results.failureList?.push({
+          description: result.description,
+          error,
+        });
+        console.log(
+          `${TEST_UNEXPECTED_FAIL} | ${result.description}${error ? ` | ${error}` : ""}`
+        );
       }
     },
     specStarted(result) {},
@@ -78,7 +93,14 @@ async function runTests(results) {
       // Report on failed suites only (indicates problems in setup/teardown).
       if (result.status === "failed") {
         ++results.failures;
-        console.log(`TEST-UNEXPECTED-FAIL | ${result.description}`);
+        const error = failureError(result);
+        results.failureList?.push({
+          description: result.description,
+          error,
+        });
+        console.log(
+          `${TEST_UNEXPECTED_FAIL} | ${result.description}${error ? ` | ${error}` : ""}`
+        );
       }
     },
     suiteStarted(result) {},
