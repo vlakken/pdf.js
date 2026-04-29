@@ -909,6 +909,11 @@ class PDFFindController {
         try {
           const pdfPage = await pdfDoc.getPage(i + 1);
           const textContent = await pdfPage.getTextContent(textOptions);
+
+          if (pdfDoc !== this._pdfDocument) {
+            resolve();
+            return;
+          }
           const strBuf = [];
 
           for (const textItem of textContent.items) {
@@ -921,6 +926,10 @@ class PDFFindController {
           [this._pageContents[i], this._pageDiffs[i], this._hasDiacritics[i]] =
             normalize(strBuf.join(""));
         } catch (ex) {
+          if (pdfDoc !== this._pdfDocument) {
+            resolve();
+            return;
+          }
           console.error(`Unable to get text content for page ${i + 1}`, ex);
           // Page error -- assuming no text content.
           [this._pageContents[i], this._pageDiffs[i], this._hasDiacritics[i]] =
