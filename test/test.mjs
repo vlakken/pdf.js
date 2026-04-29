@@ -16,6 +16,10 @@
 
 import { copySubtreeSync, ensureDirSync } from "./testutils.mjs";
 import {
+  COVERAGE_FORMAT_TO_REPORTER,
+  parseCoverageFormats,
+} from "../external/ccov/coverage_format.mjs";
+import {
   downloadManifestFiles,
   verifyManifestFiles,
 } from "./downloadutils.mjs";
@@ -1105,30 +1109,6 @@ function stopServer() {
 
 function getSession(browser) {
   return sessions.find(session => session.name === browser);
-}
-
-const COVERAGE_FORMAT_TO_REPORTER = {
-  info: "lcovonly",
-  html: "html",
-  json: "json",
-  text: "text",
-  cobertura: "cobertura",
-  clover: "clover",
-};
-
-function parseCoverageFormats(str) {
-  const formats = new Set();
-  for (const fmt of str.split(",")) {
-    const name = fmt.trim();
-    if (name && COVERAGE_FORMAT_TO_REPORTER[name]) {
-      formats.add(name);
-    } else if (name) {
-      console.warn(
-        `### Unknown coverage format "${name}", valid values: ${Object.keys(COVERAGE_FORMAT_TO_REPORTER).join(", ")}`
-      );
-    }
-  }
-  return formats.size > 0 ? formats : new Set(["info"]);
 }
 
 function accumulatePerTestCoverage(testId, counts) {

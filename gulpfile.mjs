@@ -18,6 +18,10 @@ import {
   babelPluginStripSrcPath,
   preprocessPDFJSCode,
 } from "./external/builder/babel-plugin-pdfjs-preprocessor.mjs";
+import {
+  COVERAGE_FORMAT_TO_REPORTER,
+  parseCoverageFormats,
+} from "./external/ccov/coverage_format.mjs";
 import { exec, execSync, spawn, spawnSync } from "child_process";
 import autoprefixer from "autoprefixer";
 import babel from "@babel/core";
@@ -27,7 +31,10 @@ import { finished } from "stream/promises";
 import fs from "fs";
 import gulp from "gulp";
 import hljs from "highlight.js";
+import istanbulCoverage from "istanbul-lib-coverage";
+import istanbulReportGenerator from "istanbul-reports";
 import layouts from "@metalsmith/layouts";
+import libReport from "istanbul-lib-report";
 import markdown from "@metalsmith/markdown";
 import Metalsmith from "metalsmith";
 import ordered from "ordered-read-streams";
@@ -788,7 +795,7 @@ function runTests(testsName, { bot = false } = {}) {
       const result = spawnSync(
         "node",
         [
-          path.join(__dirname, "external/coverage_search/coverage_search.mjs"),
+          path.join(__dirname, "external/ccov/coverage_search.mjs"),
           `--code=${codeArg}`,
           `--coverage-dir=${coverageDir}`,
         ],
@@ -948,7 +955,7 @@ gulp.task("coverage_search", function (done) {
   const result = spawnSync(
     "node",
     [
-      path.join(__dirname, "external/coverage_search/coverage_search.mjs"),
+      path.join(__dirname, "external/ccov/coverage_search.mjs"),
       `--code=${codeArg}`,
       `--coverage-dir=${coverageDir}`,
     ],
@@ -1714,6 +1721,7 @@ function buildLibHelper(bundleDefines, inputStream, outputDir) {
     },
   };
   const enableSourceMaps = bundleDefines.TESTING;
+  const enableCoverage = bundleDefines.COVERAGE;
 
   function preprocessLib(file, _enc, callback) {
     const skipBabel = bundleDefines.SKIP_BABEL;
@@ -1733,7 +1741,32 @@ function buildLibHelper(bundleDefines, inputStream, outputDir) {
       // Calculate relative path from output directory to source file
       const relativeSourcePath = path.relative(outputFileDir, file.path);
 
+      const plugins = [
+        [babelPluginPDFJSPreprocessor, ctx],
+        [babelPluginStripSrcPath],
+      ];
+      if (enableCoverage) {
+        plugins.push([
+          "babel-plugin-istanbul",
+          {
+            cwd: __dirname,
+            include: ["src/**/*.js", "web/**/*.js"],
+          },
+        ]);
+      }
+      plugins.push([
+        "add-header-comment",
+        {
+          header: licenseHeader,
+        },
+      ]);
+
       const result = babel.transform(file.contents.toString(), {
+        ...(enableCoverage && {
+          filename: file.path,
+          babelrc: false,
+          configFile: false,
+        }),
         sourceType: "module",
         presets: skipBabel
           ? undefined
@@ -1743,16 +1776,7 @@ function buildLibHelper(bundleDefines, inputStream, outputDir) {
                 { ...BABEL_PRESET_ENV_OPTS, loose: false, modules: false },
               ],
             ],
-        plugins: [
-          [babelPluginPDFJSPreprocessor, ctx],
-          [babelPluginStripSrcPath],
-          [
-            "add-header-comment",
-            {
-              header: licenseHeader,
-            },
-          ],
-        ],
+        plugins,
         targets: BABEL_TARGETS,
         sourceMaps: enableSourceMaps,
         sourceFileName: relativeSourcePath,
@@ -1789,6 +1813,10 @@ function buildLib(defines, dir) {
     BUNDLE_VERSION: versionInfo.version,
     BUNDLE_BUILD: versionInfo.commit,
     TESTING: defines.TESTING ?? process.env.TESTING === "true",
+    COVERAGE:
+      defines.COVERAGE ??
+      (process.argv.includes("--coverage") ||
+        process.argv.includes("--coverage-per-test")),
     DEFAULT_FTL: getDefaultFtl(),
   };
 
@@ -2164,39 +2192,62 @@ gulp.task(
     },
     function runUnitTestCli(done) {
       const useCoverage = process.argv.includes("--coverage");
+      const coverageDir =
+        getArgValue("--coverage-output") || BUILD_DIR + "coverage";
+      const coverageFormats = parseCoverageFormats(
+        getArgValue("--coverage-formats")
+      );
 
+      const coverageFile = path.join(
+        __dirname,
+        BUILD_DIR,
+        "tmp",
+        "unittestcli-coverage.json"
+      );
+      const env = { ...process.env };
       if (useCoverage) {
         console.log("\n### Running unit tests with code coverage");
+        env.UNITTESTCLI_COVERAGE_FILE = coverageFile;
+        fs.rmSync(coverageFile, { force: true });
       }
 
-      let jasmineProcess;
-      if (useCoverage) {
-        const options = [
-          "node_modules/c8/bin/c8.js",
-          "node",
-          "--max-http-header-size=80000",
-          "node_modules/jasmine/bin/jasmine",
-          "JASMINE_CONFIG_PATH=test/unit/clitests.json",
-        ];
-        jasmineProcess = spawn("node", options, { stdio: "inherit" });
-      } else {
-        const options = [
-          "--enable-source-maps",
-          "node_modules/jasmine/bin/jasmine",
-          "JASMINE_CONFIG_PATH=test/unit/clitests.json",
-        ];
-        jasmineProcess = startNode(options, { stdio: "inherit" });
-      }
+      const options = [
+        "--enable-source-maps",
+        "node_modules/jasmine/bin/jasmine",
+        "JASMINE_CONFIG_PATH=test/unit/clitests.json",
+      ];
+      const jasmineProcess = startNode(options, { stdio: "inherit", env });
 
       jasmineProcess.on("close", function (code) {
+        if (useCoverage) {
+          if (fs.existsSync(coverageFile)) {
+            const rawCoverage = JSON.parse(
+              fs.readFileSync(coverageFile, "utf8")
+            );
+            const coverageMap = istanbulCoverage.createCoverageMap(rawCoverage);
+            const context = libReport.createContext({
+              dir: coverageDir,
+              coverageMap,
+            });
+            for (const fmt of coverageFormats) {
+              istanbulReportGenerator
+                .create(COVERAGE_FORMAT_TO_REPORTER[fmt], {
+                  projectRoot: __dirname,
+                })
+                .execute(context);
+            }
+            console.log(
+              `\n### Code coverage report generated in ${coverageDir} directory`
+            );
+          } else {
+            console.warn(
+              `\n### No coverage data found at ${coverageFile}. Did the build include 'babel-plugin-istanbul'?`
+            );
+          }
+        }
         if (code !== 0) {
           done(new Error("Unit tests failed."));
           return;
-        }
-        if (useCoverage) {
-          console.log(
-            "\n### Code coverage report generated in ./build/coverage directory"
-          );
         }
         done();
       });
