@@ -78,4 +78,6 @@ jobs:
           files: ./build/coverage/font/lcov.info
           flags: fonttest
           name: codecov-umbrella
+          disable_search: true
+          disable_telem: true
           verbose: true
