@@ -117,9 +117,8 @@ async function initializePDFJS(callback) {
       "The `gulp unittest` command cannot be used in Node.js environments."
     );
   }
-  // Configure the worker. Point at the raw source so the webserver can
-  // instrument it on request and the worker accumulates `__coverage__`.
-  GlobalWorkerOptions.workerSrc = "../../src/pdf.worker.js";
+  // Configure the worker.
+  GlobalWorkerOptions.workerSrc = "../../build/generic/build/pdf.worker.mjs";
 
   callback();
 }
