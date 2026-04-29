@@ -13,9 +13,9 @@
  * limitations under the License.
  */
 
-import { shadow, unreachable } from "../shared/util.js";
 import { DecodeStream } from "./decode_stream.js";
 import { JpxImage } from "./jpx.js";
+import { shadow } from "../shared/util.js";
 
 /**
  * For JPEG 2000's we use a library to decode these images and
@@ -39,10 +39,6 @@ class JpxStream extends DecodeStream {
   ensureBuffer(requested) {
     // No-op, since `this.readBlock` will always parse the entire image and
     // directly insert all of its data into `this.buffer`.
-  }
-
-  readBlock(decoderOptions) {
-    unreachable("JpxStream.readBlock");
   }
 
   get isAsyncDecoder() {
