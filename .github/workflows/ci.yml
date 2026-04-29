@@ -60,4 +60,6 @@ jobs:
           files: ./build/coverage/unitcli/lcov.info
           flags: unittestcli
           name: codecov-umbrella
+          disable_search: true
+          disable_telem: true
           verbose: true

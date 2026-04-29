@@ -86,4 +86,6 @@ jobs:
           files: ./build/coverage/unit/lcov.info
           flags: unittest
           name: codecov-umbrella
+          disable_search: true
+          disable_telem: true
           verbose: true
