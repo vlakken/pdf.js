@@ -4839,7 +4839,6 @@ have written that much by now. So, here’s to squashing bugs.`);
       const loadingTask = getDocument(
         buildGetDocumentParams("issue11878.pdf", {
           isOffscreenCanvasSupported: false,
-          pdfBug: true,
         })
       );
       const pdfDoc = await loadingTask.promise;
