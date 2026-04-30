@@ -4844,7 +4844,8 @@ have written that much by now. So, here’s to squashing bugs.`);
       const pdfDoc = await loadingTask.promise;
       const { canvasFactory } = pdfDoc;
       let checkedCopyLocalImage = false,
-        firstImgData = null;
+        firstImgData = null,
+        firstImg32 = null;
 
       for (let i = 1; i <= pdfDoc.numPages; i++) {
         const pdfPage = await pdfDoc.getPage(i);
@@ -4895,6 +4896,8 @@ have written that much by now. So, here’s to squashing bugs.`);
           expect(firstImgData.kind).toEqual(ImageKind.RGB_24BPP);
           expect(firstImgData.data).toBeInstanceOf(Uint8ClampedArray);
           expect(firstImgData.data.length).toEqual(25245000);
+
+          firstImg32 = new Uint32Array(firstImgData.data.buffer);
         } else {
           const objsPool = i >= NUM_PAGES_THRESHOLD ? commonObjs : objs;
           const currentImgData = objsPool.get(objId);
@@ -4906,10 +4909,10 @@ have written that much by now. So, here’s to squashing bugs.`);
 
           expect(currentImgData.kind).toEqual(firstImgData.kind);
           expect(currentImgData.data).toBeInstanceOf(Uint8ClampedArray);
+
+          const currentImg32 = new Uint32Array(currentImgData.data.buffer);
           expect(
-            currentImgData.data.every(
-              (value, index) => value === firstImgData.data[index]
-            )
+            currentImg32.every((value, index) => value === firstImg32[index])
           ).toEqual(true);
 
           if (i === NUM_PAGES_THRESHOLD) {
