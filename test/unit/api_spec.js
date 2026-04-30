@@ -4833,19 +4833,18 @@ have written that much by now. So, here’s to squashing bugs.`);
 
     it("caches image resources at the document/page level as expected (issue 11878)", async function () {
       const { NUM_PAGES_THRESHOLD } = GlobalImageCache,
-        EXPECTED_WIDTH = 2550,
-        EXPECTED_HEIGHT = 3300;
+        EXPECTED_WIDTH = 1,
+        EXPECTED_HEIGHT = 1;
 
       const loadingTask = getDocument(
-        buildGetDocumentParams("issue11878.pdf", {
+        buildGetDocumentParams("issue11878_reduced.pdf", {
           isOffscreenCanvasSupported: false,
         })
       );
       const pdfDoc = await loadingTask.promise;
       const { canvasFactory } = pdfDoc;
       let checkedCopyLocalImage = false,
-        firstImgData = null,
-        firstImg32 = null;
+        firstImgData = null;
 
       for (let i = 1; i <= pdfDoc.numPages; i++) {
         const pdfPage = await pdfDoc.getPage(i);
@@ -4894,10 +4893,7 @@ have written that much by now. So, here’s to squashing bugs.`);
           expect(firstImgData.height).toEqual(EXPECTED_HEIGHT);
 
           expect(firstImgData.kind).toEqual(ImageKind.RGB_24BPP);
-          expect(firstImgData.data).toBeInstanceOf(Uint8ClampedArray);
-          expect(firstImgData.data.length).toEqual(25245000);
-
-          firstImg32 = new Uint32Array(firstImgData.data.buffer);
+          expect(firstImgData.data).toEqual(new Uint8Array([255, 0, 0]));
         } else {
           const objsPool = i >= NUM_PAGES_THRESHOLD ? commonObjs : objs;
           const currentImgData = objsPool.get(objId);
@@ -4908,24 +4904,19 @@ have written that much by now. So, here’s to squashing bugs.`);
           expect(currentImgData.height).toEqual(firstImgData.height);
 
           expect(currentImgData.kind).toEqual(firstImgData.kind);
-          expect(currentImgData.data).toBeInstanceOf(Uint8ClampedArray);
-
-          const currentImg32 = new Uint32Array(currentImgData.data.buffer);
-          expect(
-            currentImg32.every((value, index) => value === firstImg32[index])
-          ).toEqual(true);
+          expect(currentImgData.data).toEqual(firstImgData.data);
 
           if (i === NUM_PAGES_THRESHOLD) {
-            // Ensure that the image was copied in the main-thread (into
-            // commonObjs), rather than being re-parsed in the worker-thread.
+            // Given the small image size, and its lack of SMask/Mask data,
+            // the image should *not* be copied in the main-thread.
             checkedCopyLocalImage = currentImgData.CopyLocalImage;
           }
         }
       }
-      expect(checkedCopyLocalImage).toBeTruthy();
+      expect(checkedCopyLocalImage).toBeFalsy();
 
-      await loadingTask.destroy();
       firstImgData = null;
+      await loadingTask.destroy();
     });
 
     it("caches image resources at the document/page level, with main-thread copying of complex images (issue 11518)", async function () {
