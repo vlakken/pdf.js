@@ -906,40 +906,36 @@ class PDFFindController {
           resolve();
           return;
         }
-        await pdfDoc
-          .getPage(i + 1)
-          .then(pdfPage => pdfPage.getTextContent(textOptions))
-          .then(
-            textContent => {
-              const strBuf = [];
+        try {
+          const pdfPage = await pdfDoc.getPage(i + 1);
+          const textContent = await pdfPage.getTextContent(textOptions);
 
-              for (const textItem of textContent.items) {
-                strBuf.push(textItem.str);
-                if (textItem.hasEOL) {
-                  strBuf.push("\n");
-                }
-              }
+          if (pdfDoc !== this._pdfDocument) {
+            resolve();
+            return;
+          }
+          const strBuf = [];
 
-              // Store the normalized page content (text items) as one string.
-              [
-                this._pageContents[i],
-                this._pageDiffs[i],
-                this._hasDiacritics[i],
-              ] = normalize(strBuf.join(""));
-              resolve();
-            },
-            reason => {
-              console.error(
-                `Unable to get text content for page ${i + 1}`,
-                reason
-              );
-              // Page error -- assuming no text content.
-              this._pageContents[i] = "";
-              this._pageDiffs[i] = null;
-              this._hasDiacritics[i] = false;
-              resolve();
+          for (const textItem of textContent.items) {
+            strBuf.push(textItem.str);
+            if (textItem.hasEOL) {
+              strBuf.push("\n");
             }
-          );
+          }
+          // Store the normalized page content (text items) as one string.
+          [this._pageContents[i], this._pageDiffs[i], this._hasDiacritics[i]] =
+            normalize(strBuf.join(""));
+        } catch (ex) {
+          if (pdfDoc !== this._pdfDocument) {
+            resolve();
+            return;
+          }
+          console.error(`Unable to get text content for page ${i + 1}`, ex);
+          // Page error -- assuming no text content.
+          [this._pageContents[i], this._pageDiffs[i], this._hasDiacritics[i]] =
+            ["", null, false];
+        }
+        resolve();
       });
     }
   }
