@@ -14,6 +14,11 @@
  */
 /* eslint-disable no-var */
 
+import {
+  colorBrowser,
+  TEST_PASSED,
+  TEST_UNEXPECTED_FAIL,
+} from "./color_utils.mjs";
 import { copySubtreeSync, ensureDirSync } from "./testutils.mjs";
 import {
   COVERAGE_FORMAT_TO_REPORTER,
@@ -423,7 +428,7 @@ function handleSessionTimeout(session) {
     return;
   }
   console.log(
-    `TEST-UNEXPECTED-FAIL | test failed ${session.name} has not responded in ${browserTimeout}s`
+    `${TEST_UNEXPECTED_FAIL} | test failed ${session.name} has not responded in ${browserTimeout}s`
   );
   session.numErrors += session.remaining;
   session.remaining = 0;
@@ -558,7 +563,7 @@ async function checkEq(task, results, session, masterMode) {
         ) === 0;
       if (!eq) {
         console.log(
-          `TEST-UNEXPECTED-FAIL | ${taskType} ${taskId} | in ${session.name} | rendering of page ${page + 1} != reference rendering`
+          `${TEST_UNEXPECTED_FAIL} | ${taskType} ${taskId} | in ${colorBrowser(session.name)} | rendering of page ${page + 1} != reference rendering`
         );
 
         if (!testDirCreated) {
@@ -605,7 +610,9 @@ async function checkEq(task, results, session, masterMode) {
   if (numEqFailures > 0) {
     session.numEqFailures += numEqFailures;
   } else {
-    console.log(`TEST-PASS | ${taskType} test ${taskId} | in ${session.name}`);
+    console.log(
+      `${TEST_PASSED} | ${taskType} test ${taskId} | in ${colorBrowser(session.name)}`
+    );
   }
 }
 
@@ -633,13 +640,13 @@ function checkFBF(task, results, session, masterMode) {
       //       https://github.com/mozilla/pdf.js/issues/12371
       if (masterMode) {
         console.log(
-          `TEST-SKIPPED | forward-back-forward test ${task.id} | in ${session.name} | page${page + 1}`
+          `TEST-SKIPPED | forward-back-forward test ${task.id} | in ${colorBrowser(session.name)} | page${page + 1}`
         );
         continue;
       }
 
       console.log(
-        `TEST-UNEXPECTED-FAIL | forward-back-forward test ${task.id} | in ${session.name} | first rendering of page ${page + 1} != second`
+        `${TEST_UNEXPECTED_FAIL} | forward-back-forward test ${task.id} | in ${colorBrowser(session.name)} | first rendering of page ${page + 1} != second`
       );
       numFBFFailures++;
     }
@@ -649,7 +656,7 @@ function checkFBF(task, results, session, masterMode) {
     session.numFBFFailures += numFBFFailures;
   } else {
     console.log(
-      `TEST-PASS | forward-back-forward test ${task.id} | in ${session.name}`
+      `${TEST_PASSED} | forward-back-forward test ${task.id} | in ${colorBrowser(session.name)}`
     );
   }
 }
@@ -657,7 +664,9 @@ function checkFBF(task, results, session, masterMode) {
 function checkLoad(task, results, browser) {
   // Load just checks for absence of failure, so if we got here the
   // test has passed
-  console.log(`TEST-PASS | load test ${task.id} | in ${browser}`);
+  console.log(
+    `${TEST_PASSED} | load test ${task.id} | in ${colorBrowser(browser)}`
+  );
 }
 
 async function checkRefTestResults(browser, id, results) {
@@ -685,7 +694,7 @@ async function checkRefTestResults(browser, id, results) {
             "TEST-SKIPPED | PDF was not downloaded " +
               id +
               " | in " +
-              browser +
+              colorBrowser(browser) +
               " | page" +
               (page + 1) +
               " round " +
@@ -698,16 +707,7 @@ async function checkRefTestResults(browser, id, results) {
             session.numErrors++;
           }
           console.log(
-            "TEST-UNEXPECTED-FAIL | test failed " +
-              id +
-              " | in " +
-              browser +
-              " | page" +
-              (page + 1) +
-              " round " +
-              (round + 1) +
-              " | " +
-              pageResult.failure
+            `${TEST_UNEXPECTED_FAIL} | test failed ${id} | in ${colorBrowser(browser)} | page${page + 1} round ${round + 1} | ${pageResult.failure}`
           );
         }
       }
@@ -835,6 +835,16 @@ function onAllSessionsClosedAfterTests(name) {
     } else if (numErrors > 0) {
       console.log("OHNOES!  Some " + name + " tests failed!");
       console.log("  " + numErrors + " of " + numRuns + " failed");
+      console.log("Here are the failing tests:");
+      for (const session of sessions) {
+        for (const { description, error } of session.failures ?? []) {
+          let line = `  - in ${colorBrowser(session.name)} | ${description}`;
+          if (error) {
+            line += ` | ${error.replaceAll(/\s+/g, " ").trim()}`;
+          }
+          console.log(line);
+        }
+      }
     } else {
       console.log("All " + name + " tests passed.");
     }
@@ -854,6 +864,7 @@ async function startUnitTest(testUrl, name) {
     initializeSession: session => {
       session.numRuns = 0;
       session.numErrors = 0;
+      session.failures = [];
     },
   });
 }
@@ -868,15 +879,17 @@ async function startIntegrationTest() {
     initializeSession: session => {
       session.numRuns = 0;
       session.numErrors = 0;
+      session.failures = [];
     },
   });
   global.integrationBaseUrl = `http://${host}:${server.port}/build/generic/web/viewer.html`;
   global.integrationSessions = sessions;
 
-  const results = { runs: 0, failures: 0 };
+  const results = { runs: 0, failures: 0, failureList: [] };
   await runTests(results);
   sessions[0].numRuns = results.runs;
   sessions[0].numErrors = results.failures;
+  sessions[0].failures = results.failureList;
   await Promise.all(sessions.map(session => closeSession(session.name)));
 }
 
@@ -920,10 +933,20 @@ function unitTestPostHandler(parsedUrl, req, res) {
     }
     var session = getSession(data.browser);
     session.numRuns++;
+    let status = data.status;
+    if (status === "TEST-UNEXPECTED-FAIL") {
+      status = TEST_UNEXPECTED_FAIL;
+    } else if (status === "TEST-PASS") {
+      status = TEST_PASSED;
+    }
     var message =
-      data.status + " | " + data.description + " | in " + session.name;
+      status + " | " + data.description + " | in " + colorBrowser(session.name);
     if (data.status === "TEST-UNEXPECTED-FAIL") {
       session.numErrors++;
+      session.failures.push({
+        description: data.description,
+        error: data.error,
+      });
     }
     if (data.error) {
       message += " | " + data.error;
