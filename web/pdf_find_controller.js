@@ -27,8 +27,6 @@ const FindState = {
   PENDING: 3,
 };
 
-const FIND_TIMEOUT = 250; // ms
-
 const CHARACTERS_TO_NORMALIZE = {
   "\u2010": "-", // Hyphen
   "\u2018": "'", // Left single quotation mark
@@ -406,6 +404,10 @@ function getOriginalIndex(diffs, pos, len) {
  * @typedef {Object} PDFFindControllerOptions
  * @property {PDFLinkService} linkService - The navigation/linking service.
  * @property {EventBus} eventBus - The application event bus.
+ * @property {number} [delay] - The number of milliseconds to delay execution of
+ *   find commands. In the viewer each keystroke in the find bar triggers a
+ *   `find` event, so this delay avoids triggering a search prematurely when the
+ *   user is still typing the query. The default value is 250.
  * @property {boolean} [updateMatchesCountOnProgress] - True if the matches
  *   count must be updated on progress or only when the last page is reached.
  *   The default value is `true`.
@@ -419,6 +421,8 @@ class PDFFindController {
 
   #updateMatchesCountOnProgress = true;
 
+  #delay = 0;
+
   #visitedPagesCount = 0;
 
   #copiedPageData = null;
@@ -428,10 +432,16 @@ class PDFFindController {
   /**
    * @param {PDFFindControllerOptions} options
    */
-  constructor({ linkService, eventBus, updateMatchesCountOnProgress = true }) {
+  constructor({
+    linkService,
+    eventBus,
+    delay = 250,
+    updateMatchesCountOnProgress = true,
+  }) {
     this._linkService = linkService;
     this._eventBus = eventBus;
     this.#updateMatchesCountOnProgress = updateMatchesCountOnProgress;
+    this.#delay = delay;
 
     /**
      * Callback used to check if a `pageNumber` is currently visible.
@@ -521,7 +531,7 @@ class PDFFindController {
         this._findTimeout = setTimeout(() => {
           this.#nextMatch();
           this._findTimeout = null;
-        }, FIND_TIMEOUT);
+        }, this.#delay);
       } else if (this._dirtyMatch) {
         // Immediately trigger searching for non-'find' operations, when the
         // current state needs to be reset and matches re-calculated.

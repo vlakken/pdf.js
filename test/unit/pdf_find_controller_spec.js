@@ -72,10 +72,15 @@ async function initPdfFindController(
     FindControllerClass.prototype.match = matcher;
   }
 
+  // Note that in the unit tests we dispatch the `find` event with the complete
+  // query ourselves, so we can safely disable the delay option as there is no
+  // user interaction involved for typing the query (for which the delay option
+  // is intended), which provides a significant reduction in unit test runtime.
   const pdfFindController = new FindControllerClass({
     linkService,
     eventBus,
     updateMatchesCountOnProgress,
+    delay: 0,
   });
   pdfFindController.setDocument(pdfDocument); // Enable searching.
 
