@@ -826,8 +826,7 @@ class CFFParser {
       );
     }
 
-    const bytes = this.bytes;
-    const start = pos;
+    const { bytes } = this;
     const format = bytes[pos++];
     const charset = [cid ? 0 : ".notdef"];
     let id, count, i;
@@ -863,11 +862,8 @@ class CFFParser {
       default:
         throw new FormatError("Unknown charset format");
     }
-    // Raw won't be needed if we actually compile the charset.
-    const end = pos;
-    const raw = bytes.subarray(start, end);
 
-    return new CFFCharset(false, format, charset, raw);
+    return new CFFCharset(false, format, charset);
   }
 
   parseEncoding(pos, properties, strings, charset) {
@@ -1284,11 +1280,10 @@ const CFFCharsetPredefinedTypes = {
 };
 
 class CFFCharset {
-  constructor(predefined, format, charset, raw) {
+  constructor(predefined, format, charset) {
     this.predefined = predefined;
     this.format = format;
     this.charset = charset;
-    this.raw = raw;
   }
 }
 
