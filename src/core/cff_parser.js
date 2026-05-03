@@ -1400,12 +1400,6 @@ class CompilerOutput {
     return this.#buf.subarray(0, this.#pos);
   }
 
-  get finalData() {
-    const data = this.#buf.slice(0, this.#pos);
-    this.#buf = null;
-    return data;
-  }
-
   get length() {
     return this.#pos;
   }
@@ -1534,7 +1528,7 @@ class CFFCompiler {
     // the sanitizer will bail out. Add a dummy byte to avoid that.
     output.add([0]);
 
-    return output.finalData;
+    return output.data;
   }
 
   encodeNumber(value) {
