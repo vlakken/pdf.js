@@ -1845,9 +1845,7 @@ class CFFCompiler {
       case 0:
         out = new Uint8Array(1 + fdSelect.fdSelect.length);
         out[0] = format;
-        for (i = 0; i < fdSelect.fdSelect.length; i++) {
-          out[i + 1] = fdSelect.fdSelect[i];
-        }
+        out.set(fdSelect.fdSelect, 1);
         break;
       case 3:
         const start = 0;
